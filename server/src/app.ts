@@ -27,6 +27,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser(ENV.COOKIE_SECRET));
 
+// Identify the backend when its Render URL is opened in a browser.
+app.get('/', (_req, res) => {
+  res.json({
+    app: 'MoneyFlow API',
+    message: 'Backend API. Open the frontend URL to use MoneyFlow.',
+    health: '/api/health'
+  });
+});
+
 // Rate limiting for general APIs
 app.use('/api', apiLimiter);
 
