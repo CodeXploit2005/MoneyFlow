@@ -228,6 +228,8 @@ export const debtApi = {
 
 // Notification APIs
 export const notificationApi = {
+  remove: (id: string) => api.delete(`/notifications/${id}`),
+  clearRead: () => api.delete('/notifications/read'),
   respondToInvite: (id: string, action: 'accept' | 'decline') => api.post(`/notifications/${id}/respond`, { action }),
   getAll: async () => {
     return api.get('/notifications');

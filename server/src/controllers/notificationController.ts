@@ -76,3 +76,23 @@ export const respondToInvite = async (req, res) => {
     return sendError(res, error.message, 400);
   } finally { await session.endSession(); }
 };
+
+// Keep unhandled invitations when clearing read notifications.
+export const deleteReadNotifications = async (req, res) => {
+  try {
+    const result = await Notification.deleteMany({
+      userId: req.user._id, isRead: true,
+      $or: [{ type: { $ne: 'invite' } }, { 'data.status': { $in: ['accepted', 'declined'] } }]
+    });
+    return sendSuccess(res, { deletedCount: result.deletedCount }, 'Đã dọn thông báo đã đọc');
+  } catch (error) { return sendError(res, 'Không thể dọn thông báo', 500); }
+};
+
+export const deleteNotification = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return sendError(res, 'Thông báo không hợp lệ', 400);
+  try {
+    const deleted = await Notification.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+    if (!deleted) return sendError(res, 'Không tìm thấy thông báo', 404);
+    return sendSuccess(res, null, 'Đã xóa thông báo');
+  } catch (error) { return sendError(res, 'Không thể xóa thông báo', 500); }
+};

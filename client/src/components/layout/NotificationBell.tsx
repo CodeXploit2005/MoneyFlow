@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Bell, Check, CheckCheck, UserPlus } from 'lucide-react';
+import { Bell, Check, CheckCheck, UserPlus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificationApi, groupApi } from '../../api/endpoints';
 import { useAuthStore } from '../../store/authStore';
 import { useGroupStore } from '../../store/groupStore';
+import { errorMessage } from '../../utils/errorMessage';
 import { Modal } from '../ui/Modal';
 
 export const NotificationBell = () => {
@@ -34,7 +35,7 @@ export const NotificationBell = () => {
     if (busy) return;
     setBusy(id); setError('');
     try { await action(); await queryClient.invalidateQueries({ queryKey: key }); }
-    catch (err: any) { setError(err.message || 'Không thể xử lý thông báo'); }
+    catch (err: unknown) { setError(errorMessage(err, 'Không thể xử lý thông báo')); }
     finally { setBusy(null); }
   };
   const respond = (id: string, action: 'accept' | 'decline') => run(id, async () => {
@@ -52,6 +53,7 @@ export const NotificationBell = () => {
   });
   const unread = data?.unreadCount || 0;
   const items = (data?.notifications || []).filter((item: any) => filter === 'all' || !item.isRead);
+  const canClearRead = (data?.notifications || []).some((item: any) => item.isRead && (item.type !== 'invite' || ['accepted', 'declined'].includes(item.data?.status)));
   return <>
     <button ref={anchorRef} type="button" onClick={() => setOpen(v => !v)} aria-label={`Thông báo${unread ? `, ${unread} chưa đọc` : ''}`} aria-haspopup="dialog" aria-expanded={open} title="Thông báo" className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
       <Bell className="w-5 h-5" />
@@ -71,8 +73,9 @@ export const NotificationBell = () => {
           {!items.length && <div className="notification-empty"><Bell className="h-7 w-7 text-slate-300 dark:text-slate-600" /><p>{filter === 'unread' ? 'Bạn đã đọc hết thông báo' : 'Bạn chưa có thông báo nào'}</p></div>}
           {items.map((item: any) => <article key={item._id} className={`notification-item relative rounded-xl border p-3 pl-12 ${item.isRead ? 'border-slate-200 dark:border-slate-700' : 'border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20'}`}>
             <span className="notification-item-icon absolute left-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400">{item.type === 'invite' ? <UserPlus className="h-4 w-4" /> : <Bell className="h-4 w-4" />}</span>
-            {!item.isRead && <span className="absolute right-3 top-4 h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-            <h4 className="pr-3 text-[13px] font-semibold leading-5 break-words">{item.title}</h4>
+            {!item.isRead && <span className="absolute right-12 top-5 h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+            <button type="button" disabled={!!busy} onClick={() => run(item._id, () => notificationApi.remove(item._id))} aria-label={`Xóa thông báo: ${item.title}`} title="Xóa thông báo" className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
+            <h4 className="pr-9 text-[13px] font-semibold leading-5 break-words">{item.title}</h4>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-600 dark:text-slate-300 break-words">{item.message}</p>
             <time className="mt-1 block text-[10px] text-slate-400" dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</time>
             {item.type === 'invite' && !['accepted', 'declined'].includes(item.data?.status) ? <div className="notification-actions mt-2.5 flex flex-wrap gap-2">
@@ -83,6 +86,10 @@ export const NotificationBell = () => {
           </article>)}
         </>}
       </div>
+      {canClearRead && !isError && <div className="border-t border-slate-200/70 dark:border-slate-700/70 px-4 py-2">
+        <button type="button" disabled={!!busy} onClick={() => run('clear-read', () => notificationApi.clearRead())} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />Dọn thông báo đã đọc</button>
+        <p className="pb-1 text-center text-[10px] text-slate-400">Giữ lại lời mời chưa xử lý</p>
+      </div>}
     </Modal>
   </>;
 };
