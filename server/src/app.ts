@@ -9,6 +9,14 @@ import { apiLimiter } from './middlewares/rateLimiter.js';
 import { ENV, CLIENT_ORIGINS } from './config/env.js';
 
 const app = express();
+// Financial API responses must carry fresh JSON, never an empty 304 body.
+app.disable('etag');
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  delete req.headers['if-none-match'];
+  delete req.headers['if-modified-since'];
+  next();
+});
 
 // Security Middlewares
 app.use(helmet({
