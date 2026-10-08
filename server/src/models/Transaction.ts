@@ -75,6 +75,7 @@ const TransactionSchema = new mongoose.Schema(
       ref: 'Group',
       default: null
     },
+    debtId: { type: mongoose.Schema.Types.ObjectId, ref: 'Debt', default: null },
     saleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Sale',
@@ -100,5 +101,6 @@ TransactionSchema.index({ ownerId: 1, isDeleted: 1, date: -1 });
 TransactionSchema.index({ groupId: 1, isDeleted: 1, date: -1 });
 TransactionSchema.index({ categoryId: 1 });
 TransactionSchema.index({ saleId: 1 });
+TransactionSchema.index({ debtId: 1 });
 
 export default mongoose.model('Transaction', TransactionSchema);

@@ -1,8 +1,8 @@
+import { MonthPicker } from '../components/ui/MonthPicker';
 import React, { useState, useEffect } from 'react';
 import { useGroupStore } from '../store/groupStore';
 import { reportApi, categoryApi } from '../api/endpoints';
 import { useReportPeriodStore } from '../store/reportPeriodStore';
-import { OptionPicker } from '../components/ui/OptionPicker';
 import { IncomeExpenseChart, ChartDayItem } from '../components/charts/IncomeExpenseChart';
 import { CategoryPieChart, CategoryPieItem } from '../components/charts/CategoryPieChart';
 import { TopProductsCard, TopProductItem } from '../components/charts/TopProductsCard';
@@ -74,7 +74,7 @@ export const Reports: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2"><div className="w-48"><OptionPicker label="Chọn tháng báo cáo" value={selectedMonth} onChange={setSelectedMonth} options={Array.from({length:12},(_,i)=>{const d=new Date(Date.now()+7*3600000);d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-i);const value=`Tháng ${d.getUTCMonth()+1}, ${d.getUTCFullYear()}`;return {value,label:value};})} /></div><Button variant="primary" size="sm" onClick={handleExport}>
+        <div className="flex flex-wrap items-center gap-2"><div className="w-48"><MonthPicker label="Tháng báo cáo" value={`${selectedYear}-${selectedMonthNumber.padStart(2, '0')}`} onChange={value => setSelectedMonth(`Tháng ${Number(value.slice(5))}, ${value.slice(0, 4)}`)} className="w-full" /></div><Button variant="primary" size="sm" onClick={handleExport}>
           <Download className="w-4 h-4 mr-1.5" />
           Tải file CSV Excel
         </Button></div>

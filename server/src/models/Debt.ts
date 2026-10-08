@@ -12,6 +12,8 @@ const DebtPaymentSchema = new mongoose.Schema(
       type: Date,
       default: Date.now
     },
+    requestId: { type: String, default: null },
+    transactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction', default: null },
     note: {
       type: String,
       default: ''
@@ -57,6 +59,12 @@ const DebtSchema = new mongoose.Schema(
       default: 'unpaid'
     },
     payments: [DebtPaymentSchema],
+    history: [{
+      modifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      modifiedAt: { type: Date, default: Date.now },
+      action: String,
+      changes: mongoose.Schema.Types.Mixed
+    }],
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

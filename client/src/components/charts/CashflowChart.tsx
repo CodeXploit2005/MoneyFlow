@@ -1,4 +1,6 @@
 import React from 'react';
+import { TooltipProps } from 'recharts';
+interface CashflowPoint { day: string; income: number; expense: number }
 import {
   ResponsiveContainer,
   AreaChart,
@@ -21,7 +23,7 @@ export const CashflowChart = ({
   onAddTransaction,
   isDark = false,
   className = ''
-}) => {
+}: { data?: CashflowPoint[]; onAddTransaction?: () => void; isDark?: boolean; className?: string }) => {
   // Kiểm tra có dữ liệu giao dịch hay không
   const hasData = data && data.length > 0 && data.some(d => (d.income > 0 || d.expense > 0));
 
@@ -45,7 +47,7 @@ export const CashflowChart = ({
   const tickFill = isDark ? '#64748B' : '#94A3B8';
 
   // Tooltip tùy chỉnh hiển thị tiền tệ tiếng Việt
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
       const income = payload.find(p => p.dataKey === 'income')?.value || 0;
       const expense = payload.find(p => p.dataKey === 'expense')?.value || 0;

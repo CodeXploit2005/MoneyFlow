@@ -1,3 +1,4 @@
+import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import Customer from '../models/Customer.js';
 import Sale from '../models/Sale.js';
 import Transaction from '../models/Transaction.js';
@@ -11,7 +12,7 @@ export const getCustomers = async (req, res) => {
     // Tự động đồng bộ các đối tác/khách hàng từ Sổ Thu Chi sang Danh bạ Khách hàng nếu chưa có
     try {
       const distinctCounterparties = await Transaction.distinct('counterparty', {
-        ...(groupId ? { groupId } : { ownerId: (req as any).user._id, groupId: null }),
+        ...(groupId ? { groupId, ...ownDetailsFilter(req) } : { ownerId: (req as any).user._id, groupId: null }),
         isDeleted: false,
         counterparty: { $nin: ['', null, 'Nhà cung cấp / Giá vốn', 'Chuyển tiền'] }
       });
@@ -28,7 +29,7 @@ export const getCustomers = async (req, res) => {
           }
 
           const existing = await Customer.findOne({
-            ...(groupId ? { groupId } : { ownerId: (req as any).user._id, groupId: null }),
+            ...(groupId ? { groupId, ...ownDetailsFilter(req) } : { ownerId: (req as any).user._id, groupId: null }),
             $or: [
               { name: parsedName },
               ...(parsedPhone ? [{ phone: parsedPhone }] : [])
@@ -54,6 +55,7 @@ export const getCustomers = async (req, res) => {
 
     if (groupId) {
       filter.groupId = groupId;
+      Object.assign(filter, ownDetailsFilter(req));
     } else {
       filter.ownerId = req.user._id;
       filter.groupId = null;
@@ -111,7 +113,8 @@ export const getCustomerById = async (req, res) => {
     }
 
     // Lấy thống kê đơn hàng của khách
-    const sales = await Sale.find({ customerId: id }).sort({ soldAt: -1 });
+    const scope = customer.groupId ? { groupId: customer.groupId, ...ownDetailsFilter(req) } : { groupId: null, ownerId: req.user._id };
+    const sales = await Sale.find({ customerId: id, ...scope }).sort({ soldAt: -1 });
 
     const totalOrders = sales.length;
     const totalSpentFromSales = sales.reduce((sum, s) => sum + (s.price * s.quantity), 0);
@@ -120,6 +123,7 @@ export const getCustomerById = async (req, res) => {
     // Lấy các giao dịch tương ứng bên mục Sổ Thu Chi (theo saleId hoặc tên/SĐT đối tác)
     const saleIds = sales.map(s => s._id);
     const txFilter: any = {
+      ...scope,
       isDeleted: false,
       $or: [
         { saleId: { $in: saleIds } },

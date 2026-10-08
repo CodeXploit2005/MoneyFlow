@@ -1,3 +1,5 @@
+import { ownDetailsFilter } from '../utils/groupPolicy.js';
+import { getSocketIO } from '../sockets/socketHandler.js';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Group from '../models/Group.js';
@@ -94,6 +96,8 @@ export const deleteGroup = async (req, res) => {
       await Invite.deleteMany({ groupId: group._id }, { session });
       await GroupMember.deleteMany({ groupId: group._id }, { session });
     });
+    getSocketIO()?.to(`group_${req.params.groupId}`).emit('groups:changed');
+    getSocketIO()?.in(`group_${req.params.groupId}`).socketsLeave(`group_${req.params.groupId}`);
     return sendSuccess(res, null, 'Đã xóa nhóm khỏi danh sách hoạt động');
   } catch (error) { return sendError(res, error.message, 400); }
   finally { await session.endSession(); }
@@ -104,7 +108,11 @@ export const updateGroupSettings = async (req, res) => {
     const group = req.group;
     const { name, description, avatar, hideAmountsForMembers, allowMemberInvite } = req.body;
 
-    if (name) group.name = name;
+    if (name !== undefined && (typeof name !== 'string' || !name.trim() || name.trim().length > 100)) return sendError(res, 'Tên nhóm phải từ 1 đến 100 ký tự', 400);
+    if (description !== undefined && (typeof description !== 'string' || description.length > 1000)) return sendError(res, 'Mô tả tối đa 1000 ký tự', 400);
+    if ([hideAmountsForMembers, allowMemberInvite].some(value => value !== undefined && typeof value !== 'boolean')) return sendError(res, 'Thiết lập phải là bật hoặc tắt', 400);
+    if (req.userRoleInGroup !== 'owner' && (hideAmountsForMembers !== undefined || allowMemberInvite !== undefined)) return sendError(res, 'Chỉ chủ nhóm được thay đổi quyền riêng tư và quyền mời', 403);
+    if (name) group.name = name.trim();
     if (description !== undefined) group.description = description;
     if (avatar !== undefined) group.avatar = avatar;
 
@@ -116,6 +124,7 @@ export const updateGroupSettings = async (req, res) => {
     }
 
     await group.save();
+    getSocketIO()?.to(`group_${group._id}`).emit('groups:changed');
     return sendSuccess(res, group, 'Cập nhật thiết lập nhóm thành công');
   } catch (error) {
     return sendError(res, 'Lỗi cập nhật thiết lập nhóm: ' + error.message, 500);
@@ -127,6 +136,7 @@ export const createInviteCode = async (req, res) => {
     const { groupId } = req.params;
     const { daysValid = 7, maxUses = 10 } = req.body;
 
+    if (!Number.isInteger(Number(daysValid)) || Number(daysValid) < 1 || Number(daysValid) > 30 || !Number.isInteger(Number(maxUses)) || Number(maxUses) < 1 || Number(maxUses) > 100) return sendError(res, 'Mã mời có hiệu lực 1–30 ngày và 1–100 lượt dùng', 400);
     const code = crypto.randomBytes(4).toString('hex').toUpperCase(); // Mã 8 ký tự
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + Number(daysValid));
@@ -146,59 +156,29 @@ export const createInviteCode = async (req, res) => {
 };
 
 export const joinGroupByCode = async (req, res) => {
+  const { code } = req.body;
+  if (typeof code !== 'string' || !code.trim()) return sendError(res, 'Vui lòng cung cấp mã mời', 400);
+  const session = await mongoose.startSession();
   try {
-    const { code } = req.body;
-    if (!code) return sendError(res, 'Vui lòng cung cấp mã mời', 400);
-
-    const invite = await Invite.findOne({ code: code.trim().toUpperCase() });
-    if (!invite) {
-      return sendError(res, 'Mã mời không tồn tại hoặc đã hết hạn', 404);
-    }
-    if (!await Group.exists({ _id: invite.groupId, deletedAt: null })) return sendError(res, 'Nhóm đã bị xóa hoặc không còn hoạt động', 404);
-
-    if (new Date() > new Date(invite.expiresAt)) {
-      return sendError(res, 'Mã mời đã hết hạn', 400);
-    }
-
-    if (invite.usedCount >= invite.maxUses) {
-      return sendError(res, 'Mã mời đã đạt giới hạn số lượt tham gia', 400);
-    }
-
-    // Kiểm tra đã là thành viên chưa
-    const existing = await GroupMember.findOne({
-      groupId: invite.groupId,
-      userId: req.user._id
+    let joined;
+    await session.withTransaction(async () => {
+      const invite = await Invite.findOneAndUpdate({
+        code: code.trim().toUpperCase(), expiresAt: { $gt: new Date() },
+        $expr: { $lt: ['$usedCount', '$maxUses'] }
+      }, { $inc: { usedCount: 1 } }, { new: true, session });
+      if (!invite) throw new Error('Mã mời không tồn tại, đã hết hạn hoặc hết lượt dùng');
+      const group = await Group.findOneAndUpdate({ _id: invite.groupId, deletedAt: null }, { $inc: { __v: 1 } }, { new: true, session });
+      if (!group) throw new Error('Nhóm không còn hoạt động');
+      if (await GroupMember.exists({ groupId: group._id, userId: req.user._id }).session(session)) throw new Error('Bạn đã là thành viên nhóm');
+      await GroupMember.create([{ groupId: group._id, userId: req.user._id, role: 'member' }], { session });
+      await Notification.create([{ userId: group.ownerId, title: 'Thành viên mới tham gia nhóm', message: `${req.user.name} vừa tham gia nhóm "${group.name}" qua mã mời.`, type: 'group_activity', data: { groupId: group._id } }], { session });
+      joined = group;
     });
-
-    if (existing) {
-      return sendError(res, 'Bạn đã là thành viên của nhóm này rồi', 400);
-    }
-
-    // Thêm vào nhóm
-    await GroupMember.create({
-      groupId: invite.groupId,
-      userId: req.user._id,
-      role: 'member'
-    });
-
-    invite.usedCount += 1;
-    await invite.save();
-
-    const group = await Group.findById(invite.groupId);
-
-    // Thông báo cho chủ nhóm
-    await Notification.create({
-      userId: group.ownerId,
-      title: 'Thành viên mới tham gia nhóm',
-      message: `${req.user.name} vừa tham gia nhóm "${group.name}" qua mã mời.`,
-      type: 'group_activity',
-      data: { groupId: group._id }
-    });
-
-    return sendSuccess(res, group, `Bạn đã tham gia nhóm "${group.name}" thành công!`);
-  } catch (error) {
-    return sendError(res, 'Lỗi tham gia nhóm: ' + error.message, 500);
-  }
+    getSocketIO()?.to(`group_${joined._id}`).emit('groups:changed');
+    getSocketIO()?.to(`user_${joined.ownerId}`).emit('notification:created');
+    return sendSuccess(res, joined, `Đã tham gia nhóm "${joined.name}"`);
+  } catch (error) { return sendError(res, error.message, 400); }
+  finally { await session.endSession(); }
 };
 
 export const inviteByEmail = async (req, res) => {
@@ -206,6 +186,7 @@ export const inviteByEmail = async (req, res) => {
     const { groupId } = req.params;
     const { email } = req.body;
 
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return sendError(res, 'Email không hợp lệ', 400);
     const userToInvite = await User.findOne({ email: email.trim().toLowerCase() });
     if (!userToInvite) {
       return sendError(res, 'Không tìm thấy người dùng có email này trong hệ thống', 404);
@@ -222,14 +203,24 @@ export const inviteByEmail = async (req, res) => {
 
     const group = req.group;
 
-    await Notification.create({
-      userId: userToInvite._id,
-      title: 'Lời mời tham gia nhóm',
-      message: `${req.user.name} đã mời bạn tham gia nhóm "${group.name}".`,
-      type: 'invite',
-      data: { groupId: group._id }
-    });
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const active = await Group.findOneAndUpdate({ _id: group._id, deletedAt: null }, { $inc: { __v: 1 } }, { session });
+        if (!active) throw new Error('Nhóm không còn hoạt động');
+        const pending = await Notification.findOne({ userId: userToInvite._id, type: 'invite', 'data.groupId': group._id, 'data.status': { $nin: ['accepted', 'declined'] } }).session(session);
+        if (pending) throw new Error('Người này đã có lời mời đang chờ xử lý');
+        await Notification.create([{
+          userId: userToInvite._id, title: 'Lời mời tham gia nhóm',
+          message: `${req.user.name} đã mời bạn tham gia nhóm "${group.name}".`,
+          type: 'invite', data: { groupId: group._id, status: 'pending' }
+        }], { session });
+      });
+    } catch (error) {
+      return sendError(res, error.message, error.message.includes('đang chờ') ? 409 : 400);
+    } finally { await session.endSession(); }
 
+    getSocketIO()?.to(`user_${userToInvite._id}`).emit('notification:created');
     return sendSuccess(res, null, 'Đã gửi lời mời tới thành viên');
   } catch (error) {
     return sendError(res, 'Lỗi gửi lời mời: ' + error.message, 500);
@@ -269,6 +260,7 @@ export const updateMemberRole = async (req, res) => {
 
     member.role = role;
     await member.save();
+    getSocketIO()?.to(`user_${memberId}`).emit('groups:changed');
 
     return sendSuccess(res, member, 'Cập nhật vai trò thành công');
   } catch (error) {
@@ -285,11 +277,14 @@ export const removeMember = async (req, res) => {
       return sendError(res, 'Không tìm thấy thành viên trong nhóm', 404);
     }
 
+    if (member.role === 'admin' && req.userRoleInGroup !== 'owner') return sendError(res, 'Chỉ chủ nhóm được xóa quản trị viên', 403);
     if (member.role === 'owner') {
       return sendError(res, 'Không thể xóa chủ nhóm', 400);
     }
 
     await GroupMember.deleteOne({ _id: member._id });
+    getSocketIO()?.in(`user_${memberId}`).socketsLeave(`group_${groupId}`);
+    getSocketIO()?.to(`user_${memberId}`).emit('groups:changed');
     return sendSuccess(res, null, 'Đã xóa thành viên khỏi nhóm');
   } catch (error) {
     return sendError(res, 'Lỗi xóa thành viên: ' + error.message, 500);
@@ -310,6 +305,7 @@ export const leaveGroup = async (req, res) => {
     }
 
     await GroupMember.deleteOne({ _id: membership._id });
+    getSocketIO()?.in(`user_${req.user._id}`).socketsLeave(`group_${groupId}`);
     return sendSuccess(res, null, 'Bạn đã rời nhóm thành công');
   } catch (error) {
     return sendError(res, 'Lỗi rời nhóm: ' + error.message, 500);
@@ -322,11 +318,11 @@ export const getActivityFeed = async (req, res) => {
 
     // Lấy 15 giao dịch và 15 đơn bán mới nhất trong nhóm
     const [transactions, sales] = await Promise.all([
-      Transaction.find({ groupId, isDeleted: false })
+      Transaction.find({ groupId, isDeleted: false, ...ownDetailsFilter(req) })
         .populate('ownerId', 'name avatar')
         .sort({ createdAt: -1 })
         .limit(15),
-      Sale.find({ groupId })
+      Sale.find({ groupId, status: { $ne: 'void' }, ...ownDetailsFilter(req) })
         .populate('ownerId', 'name avatar')
         .populate('customerId', 'name')
         .sort({ createdAt: -1 })

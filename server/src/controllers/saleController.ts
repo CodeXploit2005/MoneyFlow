@@ -1,3 +1,5 @@
+import Group from '../models/Group.js';
+import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import mongoose from 'mongoose';
 import GroupMember from '../models/GroupMember.js';
 import Sale from '../models/Sale.js';
@@ -27,6 +29,7 @@ export const getSales = async (req, res) => {
 
     if (groupId) {
       filter.groupId = groupId;
+      Object.assign(filter, ownDetailsFilter(req));
     } else {
       filter.ownerId = (req as any).user._id;
       filter.groupId = null;
@@ -61,7 +64,7 @@ export const getSales = async (req, res) => {
       const realStatus = determineWarrantyStatus(s.warrantyEnd, now);
       if (s.status !== realStatus && s.status !== 'void') {
         s.status = realStatus;
-        s.save();
+        // Status is derived for this response; the scheduled job persists changes.
       }
     });
 
@@ -181,8 +184,11 @@ export const createSale = async (req, res) => {
     // 2. Tự động sinh khoản THU tương ứng gắn danh mục hệ thống "Bán hàng"
     const saleCategory = await CategoryService.getSystemCategory(req.user._id, groupId || null, 'Bán hàng', 'income');
 
+    const costCategory = totalCost > 0 ? await CategoryService.getSystemCategory(req.user._id, groupId || null, 'Giá vốn / Nhập hàng', 'expense') : null;
+    const session = await mongoose.startSession();
+    try { await session.withTransaction(async () => {
     if (initialPaid > 0) {
-    const incomeTx = await Transaction.create({
+    const [incomeTx] = await Transaction.create([{
       type: 'income',
       amount: initialPaid,
       title: `Bán ${quantity > 1 ? `${quantity}x ` : ''}${productName}`,
@@ -193,15 +199,14 @@ export const createSale = async (req, res) => {
       ownerId: req.user._id,
       groupId: groupId || null,
       saleId: sale._id
-    });
+    }], { session });
     sale.incomeTransactionId = incomeTx._id;
     }
 
     // 3. Tự động sinh khoản CHI (giá vốn) nếu có chi phí nhập gắn danh mục "Giá vốn / Nhập hàng"
     if (totalCost > 0) {
-      const costCategory = await CategoryService.getSystemCategory(req.user._id, groupId || null, 'Giá vốn / Nhập hàng', 'expense');
 
-      const costTx = await Transaction.create({
+      const [costTx] = await Transaction.create([{
         type: 'expense',
         amount: totalCost,
         title: `Giá vốn: ${productName}`,
@@ -212,11 +217,12 @@ export const createSale = async (req, res) => {
         ownerId: req.user._id,
         groupId: groupId || null,
         saleId: sale._id
-      });
+      }], { session });
       sale.costTransactionId = costTx._id;
     }
 
-    await sale.save();
+    await sale.save({ session });
+    }); } finally { await session.endSession(); }
     await sale.populate('customerId', 'name phone zalo email');
     await sale.populate('ownerId', 'name avatar');
 
@@ -225,7 +231,7 @@ export const createSale = async (req, res) => {
       const io = getSocketIO();
       if (io) {
         io.to(`group_${groupId}`).emit('sale:created', {
-          sale,
+          saleId: sale._id,
           actor: { _id: req.user._id, name: req.user.name }
         });
       }
@@ -238,43 +244,36 @@ export const createSale = async (req, res) => {
 };
 
 export const recordPayment = async (req, res) => {
+  const payAmount = Number(req.body.amount);
+  const { method = 'transfer', note = '' } = req.body;
+  if (!Number.isSafeInteger(payAmount) || payAmount <= 0 || !['cash', 'transfer', 'ewallet'].includes(method)) return sendError(res, 'Số tiền hoặc phương thức thanh toán không hợp lệ', 400);
+  const session = await mongoose.startSession();
   try {
-    const { id } = req.params;
-    const { amount, method = 'transfer', note = '' } = req.body;
-
-    const sale = await Sale.findById(id);
-    if (sale && !await canAccessSale(sale, req.user._id)) return sendError(res, 'Không có quyền truy cập đơn', 403);
-    if (!sale) return sendError(res, 'Không tìm thấy đơn bán', 404);
-
-    if (sale.status === 'void') return sendError(res, 'Đơn đã hủy', 400);
-    const payAmount = Number(amount);
-    if (!Number.isSafeInteger(payAmount) || payAmount > sale.price * sale.quantity - sale.paidAmount || payAmount <= 0) return sendError(res, 'Số tiền thanh toán phải lớn hơn 0', 400);
-
-    const category = await CategoryService.getSystemCategory(sale.ownerId, sale.groupId, 'Bán hàng', 'income');
-    await Transaction.create({ type: 'income', amount: payAmount, title: 'Thu tiền đơn: ' + sale.productName, categoryId: category._id, date: new Date(), ownerId: sale.ownerId, groupId: sale.groupId, saleId: sale._id, note });
-    sale.payments.push({
-      amount: payAmount,
-      date: new Date(),
-      method,
-      note
+    let result;
+    await session.withTransaction(async () => {
+      const sale = await Sale.findById(req.params.id).session(session);
+      if (!sale) throw new Error('Không tìm thấy đơn bán');
+      if (!await canAccessSale(sale, req.user._id, true)) throw new Error('Không có quyền cập nhật đơn bán này');
+      if (sale.status === 'void' || payAmount > sale.price * sale.quantity - sale.paidAmount) throw new Error('Số tiền vượt quá phần còn phải thu hoặc đơn đã hủy');
+      const category = await CategoryService.getSystemCategory(sale.ownerId, sale.groupId, 'Bán hàng', 'income');
+      await Transaction.create([{ type: 'income', amount: payAmount, title: 'Thu tiền đơn: ' + sale.productName, categoryId: category._id, date: new Date(), ownerId: sale.ownerId, groupId: sale.groupId, saleId: sale._id, method, note, history: [{ modifiedBy: req.user._id, action: 'create', modifiedAt: new Date() }] }], { session });
+      sale.payments.push({ amount: payAmount, date: new Date(), method, note });
+      sale.paidAmount += payAmount;
+      sale.paymentStatus = sale.paidAmount >= sale.price * sale.quantity ? 'paid' : 'partial';
+      await sale.save({ session });
+      result = sale;
     });
-
-    sale.paidAmount = (sale.paidAmount || 0) + payAmount;
-    const totalOrder = sale.price * sale.quantity;
-
-    if (sale.paidAmount >= totalOrder) {
-      sale.paymentStatus = 'paid';
-    } else {
-      sale.paymentStatus = 'partial';
-    }
-
-    await sale.save();
-    return sendSuccess(res, sale, 'Ghi nhận thanh toán thành công');
-  } catch (error) {
-    return sendError(res, 'Lỗi ghi nhận thanh toán: ' + error.message, 500);
-  }
+    if (result.groupId) getSocketIO()?.to(`group_${result.groupId}`).emit('sale:updated', { saleId: result._id });
+    return sendSuccess(res, result, 'Ghi nhận thanh toán thành công');
+  } catch (error) { return sendError(res, error.message, 400); }
+  finally { await session.endSession(); }
 };
 
-async function canAccessSale(sale, userId) {
-  return sale.groupId ? Boolean(await GroupMember.exists({ groupId: sale.groupId, userId })) : String(sale.ownerId?._id || sale.ownerId) === String(userId);
+async function canAccessSale(sale, userId, write = false) {
+  const own = String(sale.ownerId?._id || sale.ownerId) === String(userId);
+  if (!sale.groupId) return own;
+  const group = await Group.findOne({ _id: sale.groupId, deletedAt: null });
+  const member = await GroupMember.findOne({ groupId: sale.groupId, userId });
+  if (!group || !member) return false;
+  return write ? own || ['owner', 'admin'].includes(member.role) : own || member.role !== 'member' || !group.settings?.hideAmountsForMembers;
 }

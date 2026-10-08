@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { login } from '../src/controllers/authController.js';
 import { setBudget } from '../src/controllers/budgetController.js';
 import { createTransaction } from '../src/controllers/transactionController.js';
@@ -10,7 +10,7 @@ import { createDebt, recordDebtPayment } from '../src/controllers/debtController
 import Debt from '../src/models/Debt.js';
 let db;
 const res=()=>({code:200,status(n){this.code=n;return this;},json(body){this.body=body;return this;}});
-test.before(async()=>{db=await MongoMemoryServer.create();await mongoose.connect(db.getUri());});
+test.before(async()=>{db=await MongoMemoryReplSet.create({replSet:{count:1}});await mongoose.connect(db.getUri());});
 test.after(async()=>{await mongoose.disconnect();await db?.stop();});
 test('Wrong login returns the requested Vietnamese message',async()=>{
  const response=res();await login({body:{email:'missing@example.com',password:'wrong-password'}},response);assert.equal(response.code,401);assert.equal(response.body.message,'Tài khoản hoặc mật khẩu không đúng. Xin vui lòng nhập lại.');

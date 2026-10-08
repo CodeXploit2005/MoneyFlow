@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  LucideIcon,
   ShoppingCart,
   RefreshCw,
   Package,
@@ -30,7 +31,7 @@ import {
   CircleDot
 } from 'lucide-react';
 
-export const ICON_MAP = {
+export const ICON_MAP: Record<string, LucideIcon> = {
   'shopping-cart': ShoppingCart,
   'refresh-cw': RefreshCw,
   'package': Package,
@@ -103,7 +104,7 @@ export const AVAILABLE_COLORS = [
   '#6b7280'  // Gray
 ];
 
-export const CategoryIcon = ({ name, className = 'w-4 h-4', style = {} }) => {
+export const CategoryIcon = ({ name, className = 'w-4 h-4', style = {} }: { name?: string; className?: string; style?: React.CSSProperties }) => {
   const IconComponent = (name && ICON_MAP[name.toLowerCase()]) || Tag;
   return <IconComponent className={className} style={style} />;
 };

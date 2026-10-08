@@ -11,7 +11,8 @@ import {
   SlidersHorizontal,
   Wallet,
   Settings,
-  Sparkles
+  Sparkles,
+  Trophy
 } from 'lucide-react';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { useGroupStore } from '../../store/groupStore';
@@ -30,6 +31,7 @@ export const Sidebar = ({ isCollapsed = false, className = '' }) => {
     { name: 'Bảo hành & Hạn', href: '/warranty', icon: ShieldCheck },
     { name: 'Khách hàng', href: '/customers', icon: Users },
     { name: 'Nhóm cộng tác', href: '/groups', icon: UsersRound },
+    ...(activeGroupId ? [{ name: 'Xếp hạng bán hàng', href: '/leaderboard', icon: Trophy }] : []),
     { name: 'Báo cáo & Phân tích', href: '/reports', icon: PieChart },
     { name: 'Hạn mức ngân sách', href: '/budgets', icon: SlidersHorizontal },
     { name: 'Sổ công nợ', href: '/debts', icon: Wallet },

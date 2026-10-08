@@ -28,6 +28,8 @@ export interface LeaderboardMemberRank {
   revenue: number;
   profit: number;
   orders: number;
+  collected: number;
+  outstanding: number;
   growthRate: number;
   rank: number;
 }
@@ -36,10 +38,16 @@ export class LeaderboardService {
   /**
    * Xác định khoảng ngày hiện tại và khoảng ngày kỳ trước để so sánh
    */
-  static getDateRange(period: string = 'month'): LeaderboardDateRange {
+  static getDateRange(period: string = 'month', year?: number, month?: number): LeaderboardDateRange {
     const now = new Date();
+    if (year !== undefined || month !== undefined) {
+      if (!Number.isInteger(year) || year! < 1970 || year! > 9999 || !Number.isInteger(month) || month! < 1 || month! > 12) throw new Error('Tháng hoặc năm không hợp lệ');
+      const currentStart = new Date(Date.UTC(year!, month! - 1, 1) - 7 * 3600000);
+      const previous = addDays(currentStart, -1);
+      return { currentStart, currentEnd: new Date(Math.min(now.getTime(), getEndOfMonthVN(currentStart).getTime())), prevStart: getStartOfMonthVN(previous), prevEnd: getEndOfMonthVN(previous) };
+    }
     let currentStart: Date;
-    let currentEnd: Date = endOfDayVN(now);
+    let currentEnd: Date = now;
     let prevStart: Date | null = null;
     let prevEnd: Date | null = null;
 
@@ -88,13 +96,16 @@ export class LeaderboardService {
   static async getGroupLeaderboard({
     groupId,
     period = 'month',
-    sortBy = 'revenue'
+    sortBy = 'revenue',
+    year, month
   }: {
     groupId: string;
     period?: string;
+    year?: number;
+    month?: number;
     sortBy?: 'revenue' | 'profit' | 'orders';
   }): Promise<LeaderboardMemberRank[]> {
-    const { currentStart, currentEnd, prevStart, prevEnd } = this.getDateRange(period);
+    const { currentStart, currentEnd, prevStart, prevEnd } = this.getDateRange(period, year, month);
     const groupObjectId = new mongoose.Types.ObjectId(groupId);
 
     // Lấy danh sách thành viên nhóm
@@ -114,7 +125,8 @@ export class LeaderboardService {
           _id: '$ownerId',
           totalRevenue: { $sum: { $multiply: ['$price', '$quantity'] } },
           totalProfit: { $sum: '$profit' },
-          totalOrders: { $sum: 1 }
+          totalOrders: { $sum: 1 },
+          totalCollected: { $sum: '$paidAmount' }
         }
       }
     ]);
@@ -126,6 +138,7 @@ export class LeaderboardService {
         {
           $match: {
             groupId: groupObjectId,
+            status: { $ne: 'void' },
             soldAt: { $gte: prevStart, $lte: prevEnd }
           }
         },
@@ -134,7 +147,8 @@ export class LeaderboardService {
             _id: '$ownerId',
             totalRevenue: { $sum: { $multiply: ['$price', '$quantity'] } },
             totalProfit: { $sum: '$profit' },
-            totalOrders: { $sum: 1 }
+            totalOrders: { $sum: 1 },
+          totalCollected: { $sum: '$paidAmount' }
           }
         }
       ]);
@@ -185,6 +199,8 @@ export class LeaderboardService {
         revenue: curr.totalRevenue,
         profit: curr.totalProfit,
         orders: curr.totalOrders,
+        collected: curr.totalCollected || 0,
+        outstanding: Math.max(0, curr.totalRevenue - (curr.totalCollected || 0)),
         growthRate
       };
     });
@@ -196,11 +212,14 @@ export class LeaderboardService {
       return b.revenue - a.revenue;
     });
 
-    // Gán thứ hạng rank
-    const rankedWithRank: LeaderboardMemberRank[] = rankingList.map((item, index) => ({
-      ...item,
-      rank: index + 1
-    }));
+    let lastMetric: number | null = null;
+    let rank = 0;
+    const rankedWithRank: LeaderboardMemberRank[] = rankingList.map((item, index) => {
+      const value = item[sortBy];
+      if (value !== lastMetric) rank = index + 1;
+      lastMetric = value;
+      return { ...item, rank };
+    });
 
     return rankedWithRank;
   }

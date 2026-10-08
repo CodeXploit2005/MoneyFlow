@@ -23,6 +23,10 @@ export interface Category {
   ownerId?: string;
   groupId?: string | null;
   isDefault?: boolean;
+  isArchived?: boolean;
+  isSystem?: boolean;
+  sortOrder?: number;
+  transactionCount?: number;
 }
 
 export interface Transaction {
@@ -39,6 +43,7 @@ export interface Transaction {
   ownerId?: User | any;
   groupId?: string | null;
   saleId?: any;
+  debtId?: string;
   isDeleted?: boolean;
   history?: Array<{
     modifiedBy?: any;
@@ -131,6 +136,8 @@ export interface LeaderboardItem {
   revenue: number;
   profit: number;
   orders: number;
+  collected: number;
+  outstanding: number;
   growthRate: number;
   rank: number;
 }
@@ -155,6 +162,9 @@ export interface Debt {
   dueDate?: string;
   note?: string;
   status: 'unpaid' | 'partial' | 'paid';
+  ownerId?: string;
+  payments?: { _id: string; amount: number; date: string; transactionId?: string; note?: string }[];
+  history?: { modifiedAt: string; action: string; changes?: { amount?: { from: number; to: number }; paymentId?: string } }[];
 }
 
 export interface ActivityItem { id: string; type: string; actor: string; createdAt: string; productName?: string; title?: string; action?: string; amount: number; }

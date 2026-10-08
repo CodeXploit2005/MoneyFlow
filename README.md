@@ -28,6 +28,32 @@ Không đưa .env, khóa bí mật hoặc bản sao database lên Git. Khi tri�
 ## Kiểm tra
 
 Trong server: npm test và npm run build.
-Trong client: npm run build; kiểm tra TypeScript bằng npx tsc --noEmit.
+Trong client: `npm run typecheck` để kiểm tra kiểu; `npm run build` kiểm tra kiểu trước khi tạo bản production. Toàn bộ mã ứng dụng trong `client/src` dùng TypeScript với `strict: true`, không nhận tệp JavaScript. Backend đã dùng TypeScript. Service worker, script chạy và cấu hình công cụ giữ JavaScript theo môi trường thực thi.
 
 Test tự động dùng MongoDB tạm riêng, không sửa dữ liệu thật. Các dịch vụ ngoài như EmailJS và ngân hàng cần được kiểm tra với cấu hình triển khai thực tế.
+
+## Cách dùng nhóm và quyền dữ liệu
+
+Chọn Ví cá nhân để quản lý riêng; chọn ví nhóm trước khi tạo đơn hoặc ghi thu chi để cộng tác. Dữ liệu cá nhân không tự đưa vào nhóm. Mobile có bộ chuyển ví ở thanh đầu trang và nút về Ví cá nhân trên trang nhóm. Chuyển ví đóng biểu mẫu đang mở để tránh ghi nhầm không gian.
+
+- Chủ nhóm: quản lý quyền riêng tư, quyền mời, vai trò, ngân sách và xóa nhóm.
+- Quản trị viên: quản lý thông tin nhóm, dữ liệu tài chính và ngân sách; không đổi vai trò hoặc xóa quản trị viên khác.
+- Thành viên: tạo dữ liệu, chỉnh dữ liệu do mình tạo; không thu tiền/gia hạn/bảo hành/xóa khoản nợ thay người khác. Xem hạn mức chung; chỉ chủ nhóm/quản trị viên được sửa hạn mức.
+- Khi bật riêng tư, thành viên chỉ xem chi tiết dữ liệu do mình tạo trong thu chi, đơn bán, bảo hành, công nợ, khách hàng, hoạt động và CSV. Tổng nhóm, cơ cấu chi tiêu, hạn mức và bảng xếp hạng vẫn được chia sẻ. Dữ liệu khách hàng dùng chung có thể không hiện trong danh sách riêng của thành viên.
+- Quyền mời áp dụng cho cả email và mã. Mã mời có giới hạn lượt dùng được kiểm tra trong database transaction. Thu hồi thành viên chặn truy cập API và rời phòng realtime.
+
+Bảng xếp hạng có trong menu khi chọn nhóm, hoặc nút Hiệu quả bán hàng trên trang nhóm. Có ngày/tuần/tháng tùy chọn/năm/tất cả; chỉ tính đơn chưa hủy của thành viên hiện tại. Doanh thu là giá trị đơn, lãi gộp chưa trừ vận hành/bảo hành, đã thu là tổng thanh toán hiện tại của các đơn bán trong kỳ (khác dòng tiền thu trong kỳ). Đồng điểm cùng thứ hạng; không trao hạng cho người chưa có đơn. Dữ liệu lịch sử cập nhật khi sửa đơn hoặc thay đổi thành viên; chưa có chốt kỳ bất biến, duyệt chứng từ hay chia hoa hồng tự động.
+
+Tạo đơn bán và các khoản thu/giá vốn liên kết, thu thêm tiền đơn, và dùng mã mời đều cần MongoDB replica set/Atlas. Những thao tác này dùng transaction để tránh lưu một nửa dữ liệu hoặc vượt số dư khi thao tác đồng thời. Trang ngân sách có chọn tháng, tổng hạn mức/đã chi/còn lại và số danh mục vượt mức. Cảnh báo hạn mức tính theo các khoản chi chưa bị xóa trong tháng, tách khỏi xếp hạng lợi nhuận bán hàng.
+
+### Chạy frontend và backend cùng lúc
+
+Tại thư mục gốc `Money`, chạy `npm run dev`. Lệnh này kiểm tra backend/database ở cổng 5000 trước khi bật frontend ở cổng 5173; nếu dịch vụ đang chạy thì sử dụng lại. Giữ terminal của dịch vụ đang chạy mở. Lần đầu cần `npm install` trong cả `server` và `client`, cùng cấu hình `server/.env`. Lệnh chạy chung dùng backend không watch; sau khi sửa backend hãy khởi động lại, hoặc dùng `npm run dev` riêng trong `server` để watch.
+
+Khi Vite báo 500 cho cả `/api` và `/socket.io`, kiểm tra terminal backend và `/api/health`: proxy không thể phục vụ khi backend dừng. Biểu đồ xếp hạng dùng cùng bộ lọc kỳ và tiêu chí với bảng, hiển thị tối đa 10 thành viên đầu; bảng bên dưới giữ đầy đủ thành viên. Lãi gộp âm hiển thị màu đỏ, tiền cá nhân ngoài nhóm không tính vào thành tích nhóm.
+
+### Đối soát dòng tiền và công nợ
+
+Thanh toán công nợ mới tự tạo khoản thu (phải thu) hoặc chi (phải trả) cùng lúc cập nhật dư nợ. Không nhập thêm khoản thu/chi thủ công cho cùng lần thanh toán. Mỗi lần trả nợ từ giao diện có mã yêu cầu để gửi lại không ghi trùng. Công nợ ở trang này là sổ riêng, không tự liên kết đơn bán; thanh toán đơn bán phải ghi ở đơn bán. Tạo sổ nợ chỉ ghi số dư nợ, không tự ghi dòng tiền vay/cho vay ban đầu. Thanh toán cũ không được tự bổ sung chứng từ nhằm tránh trùng số liệu đã ghi thủ công; cần đối soát riêng.
+
+Có thể sửa tổng nợ và từng lần thanh toán tại Sổ công nợ → Lịch sử → Sửa tiền, hoặc sửa số tiền chứng từ liên kết ở Sổ thu chi. Số dư nợ và chứng từ liên kết được cập nhật cùng giao dịch database, giữ ngày thanh toán và lịch sử trước/sau. Bản ghi cũ chưa liên kết chứng từ chỉ cập nhật sổ nợ; không tự tạo khoản thu/chi mới. Không xóa trực tiếp chứng từ hoặc khoản nợ đã có thanh toán. Thu/chi bảo hành được lưu cùng cập nhật đơn trong giao dịch MongoDB, lỗi giữa chừng sẽ rollback. Database phải hỗ trợ transactions (replica set/Atlas). Dashboard “Chênh lệch thu chi” là dòng tiền thu trừ chi, không phải lợi nhuận ròng; số dư chỉ phản ánh các khoản đã ghi nhận, chưa có nghiệp vụ số dư đầu kỳ riêng.

@@ -164,3 +164,47 @@ button:focus-visible, a:focus-visible { outline: 2px solid #10b981; outline-offs
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Bell panel stays next to its trigger on desktop; mobile keeps the accessible sheet. */
+@media (min-width: 640px) {
+  .notification-root.modal-root { align-items: flex-start; justify-content: flex-end; padding: 0; }
+  .notification-root .modal-backdrop { background: transparent; backdrop-filter: none; }
+  .notification-root .notification-panel {
+    position: absolute; top: 72px; right: var(--notification-right, 24px);
+    width: min(380px, calc(100vw - 32px)); max-height: min(540px, calc(100dvh - 96px));
+    border-radius: 16px; box-shadow: 0 16px 48px -12px rgb(15 23 42 / .25);
+  }
+  .notification-panel .modal-body { padding: 0; }
+  .notification-panel > div:nth-child(2) { padding: 12px 14px; align-items: center; }
+}
+
+.notification-heading-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgb(16 185 129 / .1); color: #059669; }
+.notification-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border-bottom: 1px solid rgb(148 163 184 / .15); }
+.notification-filter { position: relative; min-height: 40px; font-size: 12px; font-weight: 600; color: #94a3b8; }
+.notification-filter.is-active { color: #059669; }
+.notification-filter.is-active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; border-radius: 2px; background: #10b981; }
+.notification-read-all { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; font-size: 11px; font-weight: 500; color: #64748b; }
+.notification-read-all:hover { color: #059669; }
+.notification-read-all:disabled { opacity: .4; cursor: default; }
+.notification-list { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.notification-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 12px; color: #94a3b8; font-size: 12px; }
+@media (min-width: 640px) {
+  .notification-panel h3 { font-size: 15px; }
+  .notification-panel > div:nth-child(2) > button { width: 28px; height: 28px; }
+  .notification-panel > div:nth-child(2) > button svg { width: 16px; height: 16px; }
+}
+@media (max-width: 639px) {
+  .notification-panel .modal-body { padding: 0 0 max(12px, env(safe-area-inset-bottom)); }
+  .notification-panel { max-height: 85dvh; }
+  .notification-toolbar { padding: 0 20px; }
+  .notification-filter { min-height: 48px; font-size: 14px; }
+  .notification-read-all { min-height: 44px; font-size: 12px; }
+  .notification-list { padding: 14px 16px; gap: 12px; }
+  .notification-item { padding: 16px 14px 12px 56px; border-radius: 16px; }
+  .notification-item-icon { top: 16px; left: 14px; width: 30px; height: 30px; }
+  .notification-item h4 { font-size: 14px; }
+  .notification-item > p { font-size: 13px; }
+  .notification-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .notification-actions button { min-height: 44px; font-size: 13px; }
+  .notification-mark-read { min-height: 36px; font-size: 11px; }
+}

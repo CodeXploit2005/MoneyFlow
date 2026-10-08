@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
 import User from '../src/models/User.js';
 import Group from '../src/models/Group.js';
@@ -16,7 +16,7 @@ import { WarrantyService } from '../src/services/warrantyService.js';
 let mongod;
 
 test.before(async () => {
-  mongod = await MongoMemoryServer.create();
+  mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   const uri = mongod.getUri();
   await mongoose.connect(uri);
 });

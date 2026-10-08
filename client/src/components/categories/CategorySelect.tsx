@@ -11,6 +11,8 @@ import {
 import { CategoryIcon, AVAILABLE_ICONS, AVAILABLE_COLORS } from './CategoryIcon';
 import { categoryApi } from '../../api/endpoints';
 import { useGroupStore } from '../../store/groupStore';
+import { Category } from '../../types';
+import { errorMessage } from '../../utils/errorMessage';
 import { Modal } from '../ui/Modal';
 
 /**
@@ -30,9 +32,9 @@ export const CategorySelect = ({
   label = 'Danh mục',
   showCount = true,
   className = ''
-}) => {
+}: { value?: string; onChange: (id: string) => void; type?: 'income' | 'expense'; categories?: Category[] | null; excludeCogs?: boolean; disabled?: boolean; label?: string; showCount?: boolean; className?: string }) => {
   const { activeGroupId } = useGroupStore();
-  const [internalCategories, setInternalCategories] = useState([]);
+  const [internalCategories, setInternalCategories] = useState<Category[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -45,9 +47,9 @@ export const CategorySelect = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  const containerRef = useRef(null);
-  const searchInputRef = useRef(null);
-  const listRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Load danh mục nếu không truyền propCategories
   const loadCategories = async () => {
@@ -114,8 +116,8 @@ export const CategorySelect = ({
 
   // Click outside to close
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -130,7 +132,7 @@ export const CategorySelect = ({
   }, [isOpen, availableCategories.length]);
 
   // Hỗ trợ phím mũi tên & Enter & Esc
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isOpen) {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -162,7 +164,7 @@ export const CategorySelect = ({
   };
 
   // Xử lý tạo danh mục mới
-  const handleCreateCategory = async (e) => {
+  const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) {
       setCreateError('Vui lòng nhập tên danh mục');
@@ -187,7 +189,7 @@ export const CategorySelect = ({
       setNewCatName('');
       setIsOpen(false);
     } catch (err) {
-      setCreateError(err.response?.data?.message || err.message || 'Lỗi tạo danh mục');
+      setCreateError(errorMessage(err, 'Lỗi tạo danh mục'));
     } finally {
       setIsSubmitting(false);
     }

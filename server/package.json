@@ -8,7 +8,7 @@
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx seed.js",
-    "test": "tsx --test tests/*.test.js",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.js",
     "build": "tsc"
   },
   "keywords": [

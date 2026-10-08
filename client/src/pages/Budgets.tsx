@@ -1,3 +1,4 @@
+import { MonthPicker } from '../components/ui/MonthPicker';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGroupStore } from '../store/groupStore';
@@ -13,8 +14,11 @@ import { CategoryIcon } from '../components/categories/CategoryIcon';
 
 export const Budgets: React.FC = () => {
   const navigate = useNavigate();
-  const { activeGroupId } = useGroupStore();
+  const { activeGroupId, myRoleInActiveGroup } = useGroupStore();
+  const canManage = !activeGroupId || ['owner', 'admin'].includes(myRoleInActiveGroup || '');
 
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 7));
+  const [loadError, setLoadError] = useState('');
   const [budgets, setBudgets] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -36,12 +40,13 @@ export const Budgets: React.FC = () => {
   };
 
   const loadBudgets = async () => {
-    setLoading(true);
+    setLoading(true); setLoadError('');
     try {
-      const res = await budgetApi.getAll({ groupId: activeGroupId || undefined });
+      const res = await budgetApi.getAll({ groupId: activeGroupId || undefined, month: Number(selectedMonth.split('-')[1]), year: Number(selectedMonth.split('-')[0]) });
       setBudgets(res.data || []);
     } catch (e) {
-      console.error(e);
+      setBudgets([]);
+      setLoadError('Chưa tải được ngân sách. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -50,7 +55,7 @@ export const Budgets: React.FC = () => {
   useEffect(() => {
     loadCategories();
     loadBudgets();
-  }, [activeGroupId]);
+  }, [activeGroupId, selectedMonth]);
 
   const handleSaveBudget = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +66,7 @@ export const Budgets: React.FC = () => {
       await budgetApi.setBudget({
         categoryId,
         amount,
+        month: Number(selectedMonth.split('-')[1]), year: Number(selectedMonth.split('-')[0]),
         groupId: activeGroupId || null
       });
       setShowModal(false);
@@ -83,6 +89,9 @@ export const Budgets: React.FC = () => {
     }
   };
 
+  const totalLimit = budgets.reduce((sum, budget) => sum + budget.amount, 0);
+  const totalSpent = budgets.reduce((sum, budget) => sum + budget.spent, 0);
+  const exceeded = budgets.filter(budget => budget.spent > budget.amount).length;
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
@@ -93,11 +102,11 @@ export const Budgets: React.FC = () => {
             <Sliders className="w-6 h-6 text-emerald-500" />
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Đặt giới hạn chi tiêu theo danh mục tháng này và nhận cảnh báo sớm
+            Đặt giới hạn theo tháng, theo dõi số đã chi và cảnh báo từ 80% hạn mức
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {canManage && <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/settings?tab=categories')}>
             <Tag className="w-4 h-4 mr-1.5" />
             + Thêm danh mục
@@ -106,21 +115,29 @@ export const Budgets: React.FC = () => {
             <Plus className="w-4 h-4 mr-1.5" />
             Thiết lập ngân sách
           </Button>
-        </div>
+        </div>}
       </div>
 
+      {!canManage && <p className="text-xs text-slate-500">Bạn có thể theo dõi hạn mức chung. Chủ nhóm hoặc quản trị viên quản lý ngân sách.</p>}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500"><span>Tháng theo dõi</span><MonthPicker label="Tháng ngân sách" value={selectedMonth} onChange={setSelectedMonth} /></div>
+        {exceeded > 0 && <span className="text-xs font-semibold text-rose-500">{exceeded} danh mục vượt hạn mức</span>}
+      </div>
+      {loadError && <div role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-600 dark:bg-rose-950/20">{loadError} <button onClick={loadBudgets} className="min-h-11 font-semibold underline">Thử lại</button></div>}
+      {!loading && !loadError && budgets.length > 0 && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[{ label: 'Hạn mức đã đặt', value: totalLimit }, { label: 'Đã chi trong các danh mục này', value: totalSpent }, { label: totalSpent > totalLimit ? 'Vượt tổng hạn mức' : 'Còn trong tổng hạn mức', value: Math.abs(totalLimit - totalSpent) }].map(item => <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><p className="text-[11px] text-slate-500">{item.label}</p><p className="mt-1 break-words text-lg font-bold">{formatVND(item.value)}</p></div>)}</div>}
+      <p className="text-[11px] text-slate-400">Chỉ tính các danh mục đã đặt hạn mức, không gồm giá vốn bán hàng. Hãy xem Báo cáo để biết toàn bộ chi tiêu.</p>
       {/* Budget Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {loading ? (
           <div className="col-span-full py-20 text-center text-xs text-slate-400">Đang tải ngân sách...</div>
         ) : budgets.length === 0 ? (
           <div className="col-span-full py-20 text-center text-slate-400 text-sm">
-            Chưa thiết lập ngân sách nào cho tháng này. Hãy đặt hạn mức chi tiêu để kiểm soát tài chính!
+            Chưa thiết lập ngân sách nào cho tháng đã chọn. Hãy đặt hạn mức chi tiêu để kiểm soát tài chính!
           </div>
         ) : (
           budgets.map((b) => {
-            const isExceeded = b.percent >= 100;
-            const isWarning = b.percent >= 80 && !isExceeded;
+            const isExceeded = b.spent > b.amount;
+            const isWarning = b.spent >= b.amount * 0.8 && !isExceeded;
 
             return (
               <div
@@ -148,12 +165,13 @@ export const Budgets: React.FC = () => {
                     </div>
                   </div>
 
-                  <button
+                  {canManage && <button
+                    aria-label="Xóa hạn mức ngân sách"
                     onClick={() => handleDeleteBudget(b._id)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </button>}
                 </div>
 
                 {/* Progress Bar */}
@@ -175,7 +193,7 @@ export const Budgets: React.FC = () => {
                   </div>
 
                   <div className="flex justify-between text-[11px] text-slate-400 pt-0.5">
-                    <span>Còn lại: {formatVND(b.remaining)}</span>
+                    <span>{isExceeded ? `Vượt: ${formatVND(b.spent - b.amount)}` : `Còn lại: ${formatVND(b.remaining)}`}</span>
                     {isExceeded && (
                       <span className="text-rose-600 font-bold flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5" />
@@ -197,7 +215,7 @@ export const Budgets: React.FC = () => {
       </div>
 
       {/* Set Budget Modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Đặt hạn mức ngân sách tháng này">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={`Đặt hạn mức · ${selectedMonth.split('-').reverse().join('/')}`}>
         <form onSubmit={handleSaveBudget} className="space-y-4">
           <CategorySelect
             value={categoryId}

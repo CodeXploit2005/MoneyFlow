@@ -1,3 +1,4 @@
+import { useAuthStore } from '../store/authStore';
 import React, { useState, useEffect } from 'react';
 import { useGroupStore } from '../store/groupStore';
 import { warrantyApi } from '../api/endpoints';
@@ -19,7 +20,9 @@ import {
 import { Sale } from '../types';
 
 export const Warranty: React.FC = () => {
-  const { activeGroupId } = useGroupStore();
+  const { activeGroupId, myRoleInActiveGroup } = useGroupStore();
+  const userId = useAuthStore(state => state.user?._id);
+  const canEdit = (sale: Sale) => !activeGroupId || (typeof sale.ownerId === 'object' ? sale.ownerId?._id : sale.ownerId) === userId || ['owner', 'admin'].includes(myRoleInActiveGroup || '');
 
   const [allWarranties, setWarranties] = useState<Sale[]>([]);
   const [keyword, setKeyword] = useState('');
@@ -193,6 +196,7 @@ export const Warranty: React.FC = () => {
                         <Button
                           variant="secondary"
                           size="sm"
+                          disabled={!canEdit(sale) || sale.status === 'void'}
                           onClick={() => setRenewSale(sale)}
                         >
                           <RefreshCw className="w-3.5 h-3.5 mr-1 text-emerald-600" />
@@ -202,6 +206,7 @@ export const Warranty: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={!canEdit(sale) || sale.status === 'void'}
                           onClick={() => setClaimSale(sale)}
                         >
                           <ShieldAlert className="w-3.5 h-3.5 mr-1 text-rose-500" />
@@ -244,6 +249,7 @@ export const Warranty: React.FC = () => {
                           <div className="text-[11px] text-slate-400 truncate">{custName}</div>
                         </div>
                         <button
+                          disabled={!canEdit(it) || it.status === 'void'}
                           onClick={() => setRenewSale(it)}
                           className="px-2 py-1 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 text-[10px] font-bold shrink-0 hover:bg-emerald-100"
                         >

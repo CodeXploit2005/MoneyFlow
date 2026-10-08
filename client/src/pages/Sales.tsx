@@ -24,7 +24,7 @@ import { Sale } from '../types';
 
 export const Sales: React.FC = () => {
   const { user } = useAuthStore();
-  const { activeGroupId } = useGroupStore();
+  const { activeGroupId, myRoleInActiveGroup } = useGroupStore();
 
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -61,6 +61,12 @@ export const Sales: React.FC = () => {
 
   useEffect(() => {
     loadSales();
+  }, [activeGroupId, keyword, paymentStatus]);
+
+  useEffect(() => {
+    const refresh = () => { void loadSales(); };
+    window.addEventListener('moneyflow:data-changed', refresh);
+    return () => window.removeEventListener('moneyflow:data-changed', refresh);
   }, [activeGroupId, keyword, paymentStatus]);
 
   const handleRecordPayment = async (e: React.FormEvent) => {
@@ -130,6 +136,8 @@ export const Sales: React.FC = () => {
               const wInfo = formatWarrantyTime(sale.warrantyEnd);
               const custName = typeof sale.customerId === 'object' ? sale.customerId?.name : 'Khách lẻ';
               const custPhone = typeof sale.customerId === 'object' ? sale.customerId?.phone : '';
+              const creatorId = typeof sale.ownerId === 'object' ? sale.ownerId?._id : sale.ownerId;
+              const canEdit = !activeGroupId || creatorId === user?._id || ['owner', 'admin'].includes(myRoleInActiveGroup || '');
               const ownerName = typeof sale.ownerId === 'object' ? sale.ownerId?.name : 'Tôi';
 
               return (
@@ -180,7 +188,7 @@ export const Sales: React.FC = () => {
 
                       {/* Action buttons */}
                       <div className="flex flex-wrap items-center gap-2 mt-2">
-                        {sale.paymentStatus !== 'paid' && (
+                        {canEdit && sale.status !== 'void' && sale.paymentStatus !== 'paid' && (
                           <Button
                             variant="secondary"
                             size="sm"
@@ -209,6 +217,7 @@ export const Sales: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={!canEdit || sale.status === 'void'}
                           onClick={() => setRenewSale(sale)}
                           aria-label="Gia hạn bảo hành"
                           className="min-w-[44px]"
@@ -220,6 +229,7 @@ export const Sales: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={!canEdit || sale.status === 'void'}
                           onClick={() => setClaimSale(sale)}
                           aria-label="Ghi nhận bảo hành / đổi"
                           className="min-w-[44px]"

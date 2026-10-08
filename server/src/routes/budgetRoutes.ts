@@ -1,3 +1,5 @@
+import Budget from '../models/Budget.js';
+import { requireResourceAccess } from '../middlewares/resourceGuard.js';
 import { Router } from 'express';
 import { getBudgets, setBudget, deleteBudget } from '../controllers/budgetController.js';
 import { authenticate } from '../middlewares/auth.js';
@@ -9,7 +11,7 @@ router.use(authenticate);
 router.use(optionalGroupGuard);
 
 router.get('/', getBudgets);
-router.post('/', setBudget);
-router.delete('/:id', deleteBudget);
+router.post('/', (req, res, next) => req.body.groupId ? requireGroupMember(['owner', 'admin'])(req, res, next) : next(), setBudget);
+router.delete('/:id', requireResourceAccess(Budget, true, true), deleteBudget);
 
 export default router;

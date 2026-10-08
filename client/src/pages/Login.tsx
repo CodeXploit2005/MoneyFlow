@@ -294,6 +294,7 @@ export const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
             />
 
             {/* Thông tin VietQR nếu đăng ký */}

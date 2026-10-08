@@ -3,6 +3,7 @@ import Transaction from '../models/Transaction.js';
 import Category from '../models/Category.js';
 import Customer from '../models/Customer.js';
 import { correctLinkedAmount } from '../services/TransactionCorrectionService.js';
+import { correctDebtPayment } from '../services/debtCorrectionService.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { getSocketIO } from '../sockets/socketHandler.js';
 
@@ -158,14 +159,22 @@ export const createTransaction = async (req, res) => {
     } = req.body;
 
     if (!Number.isSafeInteger(Number(amount)) || Number(amount) <= 0) return sendError(res, 'Số tiền phải là số nguyên lớn hơn 0', 400);
+    if (type && !['income', 'expense'].includes(type)) return sendError(res, 'Loại thu chi không hợp lệ', 400);
+    if (date && !Number.isFinite(new Date(date).getTime())) return sendError(res, 'Ngày giao dịch không hợp lệ', 400);
 
+    if (saleId || req.body.debtId) return sendError(res, 'Chứng từ liên kết phải được tạo từ đơn bán hoặc công nợ', 400);
     let targetCategoryId = categoryId;
+    const categoryScope = groupId ? { groupId } : { ownerId: req.user._id, groupId: null };
+    if (targetCategoryId && (!mongoose.isValidObjectId(targetCategoryId) || !await Category.exists({ _id: targetCategoryId, ...categoryScope, type: type || 'income', isArchived: false }))) {
+      return sendError(res, 'Danh mục không thuộc ví hoặc không đúng loại thu chi', 400);
+    }
 
     // Đảm bảo categoryId luôn là ObjectId hợp lệ, tránh lỗi CastError 500
     if (!targetCategoryId || !mongoose.Types.ObjectId.isValid(targetCategoryId)) {
       let existingCat = await Category.findOne({
-        ownerId: req.user._id,
-        type: type || 'income'
+        ...categoryScope,
+        type: type || 'income',
+        isArchived: false
       });
 
       if (!existingCat) {
@@ -241,7 +250,7 @@ export const createTransaction = async (req, res) => {
       const io = getSocketIO();
       if (io) {
         io.to(`group_${groupId}`).emit('transaction:created', {
-          transaction: tx,
+          transactionId: tx._id,
           actor: { _id: req.user._id, name: req.user.name }
         });
       }
@@ -274,6 +283,22 @@ export const updateTransaction = async (req, res) => {
       return sendError(res, 'Bạn không có quyền chỉnh sửa giao dịch này', 403);
     }
 
+    if (tx.debtId) {
+      for (const key of ['type', 'date', 'categoryId']) {
+        if (!(key in updateData)) continue;
+        const value = updateData[key];
+        const unchanged = key === 'date' ? new Date(value as any).getTime() === tx.date.getTime() : String((value as any)?._id || value) === String(tx[key]);
+        if (!unchanged) return sendError(res, 'Loại, ngày và danh mục được giữ theo lần thanh toán công nợ', 400);
+        delete updateData[key];
+      }
+      if ('amount' in updateData && Number(updateData.amount) !== tx.amount) {
+        try {
+          await correctDebtPayment({ debtId: tx.debtId, transactionId: tx._id, amount: Number(updateData.amount), actorId: req.user._id, expectedAmount: tx.amount });
+          tx = await Transaction.findById(id);
+        } catch (error) { return sendError(res, error.message, 400); }
+      }
+      delete updateData.amount;
+    }
     if (tx.saleId) {
       const metadata = ['amount', 'title', 'note', 'method', 'counterparty', 'receiptUrl'];
       // Keep the sale's type/category/date intact; amount corrections are
@@ -291,7 +316,7 @@ export const updateTransaction = async (req, res) => {
         try {
           const sale = await correctLinkedAmount(id, Number(updateData.amount), req.user._id);
           const io = getSocketIO();
-          if (io && sale.groupId) io.to(`group_${sale.groupId}`).emit('sale:updated', {sale, actor: {_id: req.user._id, name: req.user.name}});
+          if (io && sale.groupId) io.to(`group_${sale.groupId}`).emit('sale:updated', {saleId: sale._id, actor: {_id: req.user._id, name: req.user.name}});
           tx = await Transaction.findById(id);
         } catch (error) {
           return sendError(res, error.message, 400);
@@ -325,7 +350,7 @@ export const updateTransaction = async (req, res) => {
       const io = getSocketIO();
       if (io) {
         io.to(`group_${tx.groupId}`).emit('transaction:updated', {
-          transaction: tx,
+          transactionId: tx._id,
           actor: { _id: req.user._id, name: req.user.name }
         });
       }
@@ -353,6 +378,7 @@ export const softDeleteTransaction = async (req, res) => {
       return sendError(res, 'Bạn không có quyền xóa giao dịch này', 403);
     }
 
+    if (tx.debtId) return sendError(res, 'Không thể xóa chứng từ thanh toán công nợ', 400);
     if (tx.saleId) return sendError(res, 'Giao dịch liên kết đơn bán không thể xóa trực tiếp', 400);
     tx.isDeleted = true;
     tx.deletedAt = new Date();

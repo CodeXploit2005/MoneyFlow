@@ -1,3 +1,4 @@
+import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import Transaction from '../models/Transaction.js';
 import { ReportService } from '../services/reportService.js';
 import { sendSuccess, sendError } from '../utils/response.js';
@@ -92,6 +93,7 @@ export const exportTransactionsCsv = async (req, res) => {
 
     if (groupId) {
       filter.groupId = groupId;
+      Object.assign(filter, ownDetailsFilter(req));
     } else {
       filter.ownerId = (req as any).user._id;
       filter.groupId = null;

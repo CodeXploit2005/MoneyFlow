@@ -1,19 +1,11 @@
-const CACHE_NAME = 'moneyflow-v1';
-
-self.addEventListener('install', (e) => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (e) => {
-  e.waitUntil(clients.claim());
-});
-
-self.addEventListener('fetch', (e) => {
-  // Let network handle dynamic API requests
-  if (e.request.url.includes('/api/') || e.request.url.includes('/socket.io/')) {
-    return;
-  }
-  e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
-  );
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin ||
+      url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return;
+  event.respondWith(fetch(event.request).catch(async () => {
+    const cached = await caches.match(event.request);
+    return cached || Response.error();
+  }));
 });

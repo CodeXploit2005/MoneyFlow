@@ -1,4 +1,5 @@
 import api from './axios';
+import { API_URL } from './config';
 
 // Auth APIs
 export const authApi = {
@@ -191,7 +192,7 @@ export const reportApi = {
   getExportUrl: (params?: any) => {
     const query = new URLSearchParams(params).toString();
     const token = localStorage.getItem('moneyflow_token');
-    return `${import.meta.env.VITE_API_URL || '/api'}/reports/export-csv?${query}&token=${token}`;
+    return `${API_URL}/reports/export-csv?${query}&token=${token}`;
   }
 };
 
@@ -209,6 +210,8 @@ export const budgetApi = {
 };
 
 export const debtApi = {
+  update: (id: string, data: any) => api.patch(`/debts/${id}`, data),
+  updatePayment: (id: string, paymentId: string, data: any) => api.patch(`/debts/${id}/payments/${paymentId}`, data),
   getAll: async (params?: any) => {
     return api.get('/debts', { params });
   },
@@ -225,6 +228,7 @@ export const debtApi = {
 
 // Notification APIs
 export const notificationApi = {
+  respondToInvite: (id: string, action: 'accept' | 'decline') => api.post(`/notifications/${id}/respond`, { action }),
   getAll: async () => {
     return api.get('/notifications');
   },

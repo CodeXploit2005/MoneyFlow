@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { API_URL } from './config';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: API_URL,
   withCredentials: true,
   timeout: 15000,
   headers: {
@@ -72,7 +73,7 @@ api.interceptors.response.use(
 
       try {
         const res = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/refresh-token`,
+          `${API_URL}/auth/refresh-token`,
           {},
           { withCredentials: true }
         );
@@ -80,6 +81,7 @@ api.interceptors.response.use(
         if (res.data?.data?.accessToken) {
           const newToken = res.data.data.accessToken;
           localStorage.setItem('moneyflow_token', newToken);
+          useAuthStore.setState({ token: newToken });
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           processQueue(null, newToken);
           return api(originalRequest);

@@ -14,7 +14,7 @@ import {
  * Bố cục 5 cột đối xứng hoàn hảo với nút (+) xanh / (X) đỏ ở chính giữa:
  * 1. Tổng quan | 2. Thu Chi | 3. [+] THÊM NHANH | 4. Bán hàng | 5. Thêm
  */
-export const MobileTabBar = ({ onOpenMore, onToggleQuickAdd, isQuickAddOpen }) => {
+export const MobileTabBar = ({ onOpenMore, onToggleQuickAdd, isQuickAddOpen }: { onOpenMore: () => void; onToggleQuickAdd: () => void; isQuickAddOpen: boolean }) => {
   return (
     <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border-t border-[#E5E7EB] dark:border-[#243044] safe-bottom transition-colors shadow-lg shadow-black/5`}>
       <div className="grid grid-cols-5 h-16 items-center px-1">

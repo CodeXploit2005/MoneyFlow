@@ -1,3 +1,4 @@
+import Group from '../models/Group.js';
 import { Server, Socket } from 'socket.io';
 import { verifyAccessToken } from '../utils/jwt.js';
 import GroupMember from '../models/GroupMember.js';
@@ -49,7 +50,7 @@ export const initSocket = (server: any, clientUrl: string | string[]): Server =>
           userId: socket.userId
         });
 
-        if (isMember) {
+        if (isMember && await Group.exists({ _id: groupId, deletedAt: null })) {
           socket.join(`group_${groupId}`);
           console.log(`👥 User ${socket.userId} joined group_${groupId}`);
           socket.emit('joined_group_success', { groupId });

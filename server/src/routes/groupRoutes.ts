@@ -18,7 +18,8 @@ import { authenticate } from '../middlewares/auth.js';
 import {
   requireGroupMember,
   requireGroupAdminOrOwner,
-  requireGroupOwner
+  requireGroupOwner,
+  requireInvitePermission
 } from '../middlewares/groupMemberGuard.js';
 
 const router = Router();
@@ -36,12 +37,12 @@ router.put('/:groupId/settings', requireGroupAdminOrOwner, updateGroupSettings);
 router.get('/:groupId/activity', requireGroupMember(), getActivityFeed);
 
 // Mời thành viên
-router.post('/:groupId/invites', requireGroupMember(), createInviteCode);
-router.post('/:groupId/invite-email', requireGroupAdminOrOwner, inviteByEmail);
+router.post('/:groupId/invites', requireGroupMember(), requireInvitePermission, createInviteCode);
+router.post('/:groupId/invite-email', requireGroupMember(), requireInvitePermission, inviteByEmail);
 
 // Quản lý thành viên
 router.get('/:groupId/members', requireGroupMember(), getGroupMembers);
-router.put('/:groupId/members/:memberId/role', requireGroupAdminOrOwner, updateMemberRole);
+router.put('/:groupId/members/:memberId/role', requireGroupOwner, updateMemberRole);
 router.delete('/:groupId/members/:memberId', requireGroupAdminOrOwner, removeMember);
 router.post('/:groupId/leave', leaveGroup);
 

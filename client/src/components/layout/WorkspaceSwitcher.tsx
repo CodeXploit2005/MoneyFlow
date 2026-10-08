@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Users, ChevronDown, Check, Plus } from 'lucide-react';
 import { useGroupStore } from '../../store/groupStore';
-import { groupApi } from '../../api/endpoints';
-import { useAuthStore } from '../../store/authStore';
+import { Group } from '../../types';
+import { useWorkspaceGroups } from '../../hooks/useWorkspaceGroups';
 
 /**
  * Component WorkspaceSwitcher dạng dropdown
@@ -12,15 +12,15 @@ import { useAuthStore } from '../../store/authStore';
 export const WorkspaceSwitcher = ({ isCollapsed = false }) => {
   const navigate = useNavigate();
   const { activeGroupId, activeGroupName, setActiveGroup, groups, setGroups } = useGroupStore();
-  const userId = useAuthStore(state => state.user?._id);
+  useWorkspaceGroups();
 
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -28,28 +28,12 @@ export const WorkspaceSwitcher = ({ isCollapsed = false }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Tải danh sách nhóm người dùng đã tham gia
-  useEffect(() => {
-    let cancelled = false;
-    const fetchGroups = async () => {
-      try {
-        const res = await groupApi.getMyGroups();
-        if (!cancelled) setGroups(res.data || []);
-      } catch (err) {
-        console.warn('Cannot fetch groups', err);
-      }
-    };
-    fetchGroups();
-    window.addEventListener('focus', fetchGroups);
-    return () => { cancelled = true; window.removeEventListener('focus', fetchGroups); };
-  }, [userId, isOpen, setGroups]);
-
   const handleSelectPersonal = () => {
     setActiveGroup(null, 'Ví cá nhân', null);
     setIsOpen(false);
   };
 
-  const handleSelectGroup = (group) => {
+  const handleSelectGroup = (group: Group) => {
     setActiveGroup(group._id, group.name, group.myRole);
     setIsOpen(false);
   };

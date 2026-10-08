@@ -1,3 +1,5 @@
+import { MobileWorkspaceSwitcher } from './MobileWorkspaceSwitcher';
+import { NotificationBell } from './NotificationBell';
 import { Avatar } from '../ui/Avatar';
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -11,18 +13,18 @@ import { useGroupStore } from '../../store/groupStore';
  * Trái: Breadcrumb "Ví cá nhân / [Tên Trang]"
  * Phải: ThemeToggle pill + Chuông thông báo + User Profile
  */
-export const Topbar = ({ onToggleSidebarCollapse, isSidebarCollapsed }) => {
+export const Topbar = ({ onToggleSidebarCollapse, isSidebarCollapsed }: { onToggleSidebarCollapse: () => void; isSidebarCollapsed: boolean }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const { activeGroupName } = useGroupStore();
 
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const userMenuRef = useRef(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setShowUserMenu(false);
       }
     };
@@ -38,6 +40,7 @@ export const Topbar = ({ onToggleSidebarCollapse, isSidebarCollapsed }) => {
     if (path.includes('/sales')) return 'Bán hàng';
     if (path.includes('/warranty')) return 'Bảo hành & Hạn';
     if (path.includes('/customers')) return 'Khách hàng';
+    if (path.includes('/leaderboard')) return 'Xếp hạng bán hàng';
     if (path.includes('/groups')) return 'Nhóm cộng tác';
     if (path.includes('/reports')) return 'Báo cáo & Phân tích';
     if (path.includes('/budgets')) return 'Hạn mức ngân sách';
@@ -56,32 +59,25 @@ export const Topbar = ({ onToggleSidebarCollapse, isSidebarCollapsed }) => {
 
   return (
     <header className="h-16 px-4 sm:px-6 bg-white dark:bg-[#111827] border-b border-[#E5E7EB] dark:border-[#243044] flex items-center justify-between transition-colors duration-200 shrink-0">
+      <div className="md:hidden min-w-0 flex-1 mr-2"><MobileWorkspaceSwitcher /></div>
       {/* 1. Bên trái: Breadcrumb nhỏ với icon người */}
-      <div className="flex items-center gap-2 text-xs text-[#64748B] dark:text-[#94A3B8]">
-        <div className="flex items-center gap-1.5">
+      <div className="hidden md:flex items-center gap-2 min-w-0 flex-1 mr-2 text-xs text-[#64748B] dark:text-[#94A3B8]">
+        <div className="hidden sm:flex items-center gap-1.5 min-w-0">
           <User className="w-3.5 h-3.5 stroke-[2] text-[#10B981]" />
-          <span>{activeGroupName || 'Ví cá nhân'}</span>
+          <span className="truncate max-w-40">{activeGroupName || 'Ví cá nhân'}</span>
         </div>
-        <span className="text-slate-300 dark:text-slate-600">/</span>
-        <span className="font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+        <span className="hidden sm:inline text-slate-300 dark:text-slate-600">/</span>
+        <span className="truncate font-bold text-[#0F172A] dark:text-[#F1F5F9]">
           {getPageTitle()}
         </span>
       </div>
 
       {/* 2. Bên phải: ThemeToggle pill + Chuông + Avatar & Tên */}
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-3">
         {/* Nút chuyển Theme dạng viên thuốc */}
         <ThemeToggle />
 
-        {/* Chuông thông báo */}
-        <button
-          type="button"
-          title="Thông báo"
-          className="relative p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1E293B] transition"
-        >
-          <Bell className="w-4 h-4 stroke-[2]" />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
-        </button>
+        <NotificationBell />
 
         {/* User profile dropdown */}
         <div className="relative" ref={userMenuRef}>

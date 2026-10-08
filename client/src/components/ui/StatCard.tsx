@@ -1,4 +1,10 @@
 import React from 'react';
+import { LucideIcon } from 'lucide-react';
+
+interface StatCardProps {
+  title: string; value?: string | number; subtitle?: React.ReactNode;
+  icon?: LucideIcon; variant?: 'income' | 'expense' | 'profit' | 'warranty'; className?: string;
+}
 
 /**
  * Component StatCard theo thiết kế Dashboard MoneyFlow
@@ -17,7 +23,7 @@ export const StatCard = ({
   icon: Icon,
   variant = 'income',
   className = ''
-}) => {
+}: StatCardProps) => {
   // Bảng phối màu chuẩn hệ thống thiết kế Light / Dark mode
   const colorMap = {
     // 1. Tổng thu (Xanh lục ngọc)

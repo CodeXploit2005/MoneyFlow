@@ -493,7 +493,7 @@ export const MockService = {
     setStore('sales', sales);
 
     // Đồng bộ tạo 1 khoản thu và 1 khoản chi (nếu có giá vốn)
-    if (newSale.paidAmount > 0) await MockService.createTransaction({
+    if (newSale.paidAmount !== undefined && newSale.paidAmount > 0) await MockService.createTransaction({
       type: 'income',
       amount: newSale.paidAmount,
       title: `Bán ${data.productName}`,
@@ -665,6 +665,8 @@ export const MockService = {
         avatar: INITIAL_USERS[0].avatar,
         role: 'owner',
         revenue: 450000,
+        collected: 450000,
+        outstanding: 0,
         profit: 300000,
         orders: 1,
         growthRate: 45.5,
@@ -677,6 +679,8 @@ export const MockService = {
         avatar: INITIAL_USERS[1].avatar,
         role: 'admin',
         revenue: 430000,
+        collected: 430000,
+        outstanding: 0,
         profit: 300000,
         orders: 2,
         growthRate: 20.0,
@@ -689,6 +693,8 @@ export const MockService = {
         avatar: INITIAL_USERS[2].avatar,
         role: 'member',
         revenue: 240000,
+        collected: 240000,
+        outstanding: 0,
         profit: 180000,
         orders: 1,
         growthRate: 10.0,

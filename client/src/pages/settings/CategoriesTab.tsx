@@ -1,3 +1,5 @@
+import { Category } from '../../types';
+import { errorMessage } from '../../utils/errorMessage';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Tag,
@@ -24,15 +26,15 @@ export const CategoriesTab = () => {
   const { activeGroupId, activeGroupName, myRoleInActiveGroup } = useGroupStore();
 
   const [activeSubTab, setActiveSubTab] = useState('expense'); // 'expense' | 'income'
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState({ type: '', text: '' });
 
   // Modal thêm/sửa danh mục
-  const [modalMode, setModalMode] = useState(null); // 'create' | 'edit' | null
-  const [editingCategory, setEditingCategory] = useState(null);
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null); // 'create' | 'edit' | null
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [catName, setCatName] = useState('');
   const [catIcon, setCatIcon] = useState('tag');
   const [catColor, setCatColor] = useState('#10b981');
@@ -40,7 +42,7 @@ export const CategoriesTab = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Modal xác nhận ẩn danh mục
-  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [archiveTarget, setArchiveTarget] = useState<Category | null>(null);
   const [isArchiving, setIsArchiving] = useState(false);
 
   // Quyền hạn: Nếu ở nhóm, role member chỉ được xem
@@ -68,7 +70,7 @@ export const CategoriesTab = () => {
     loadCategories();
   }, [activeGroupId]);
 
-  const showFeedback = (type, text) => {
+  const showFeedback = (type: 'success' | 'error', text: string) => {
     setFeedbackMsg({ type, text });
     setTimeout(() => setFeedbackMsg({ type: '', text: '' }), 4000);
   };
@@ -95,7 +97,7 @@ export const CategoriesTab = () => {
   };
 
   // Mở modal chỉnh sửa
-  const handleOpenEdit = (category) => {
+  const handleOpenEdit = (category: Category) => {
     setEditingCategory(category);
     setCatName(category.name);
     setCatIcon(category.icon || 'tag');
@@ -105,7 +107,7 @@ export const CategoriesTab = () => {
   };
 
   // Lưu danh mục (Tạo mới hoặc Cập nhật)
-  const handleSubmitCategory = async (e) => {
+  const handleSubmitCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!catName.trim()) {
       setModalError('Vui lòng nhập tên danh mục');
@@ -141,7 +143,7 @@ export const CategoriesTab = () => {
       }
       setModalMode(null);
     } catch (err) {
-      setModalError(err.response?.data?.message || err.message || 'Lỗi thao tác danh mục');
+      setModalError(errorMessage(err, 'Lỗi thao tác danh mục'));
     } finally {
       setIsSubmitting(false);
     }
@@ -159,14 +161,14 @@ export const CategoriesTab = () => {
       showFeedback('success', `Đã ẩn danh mục "${archiveTarget.name}"`);
       setArchiveTarget(null);
     } catch (err) {
-      showFeedback('error', err.response?.data?.message || 'Không thể ẩn danh mục');
+      showFeedback('error', errorMessage(err, 'Không thể ẩn danh mục'));
     } finally {
       setIsArchiving(false);
     }
   };
 
   // Khôi phục danh mục
-  const handleRestore = async (category) => {
+  const handleRestore = async (category: Category) => {
     try {
       await categoryApi.restore(category._id);
       setCategories((prev) =>
@@ -174,12 +176,12 @@ export const CategoriesTab = () => {
       );
       showFeedback('success', `Đã khôi phục danh mục "${category.name}"`);
     } catch (err) {
-      showFeedback('error', err.response?.data?.message || 'Không thể khôi phục danh mục');
+      showFeedback('error', errorMessage(err, 'Không thể khôi phục danh mục'));
     }
   };
 
   // Đổi thứ tự lên / xuống
-  const handleMoveOrder = async (index, direction) => {
+  const handleMoveOrder = async (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= filteredCategories.length) return;
 
@@ -286,36 +288,40 @@ export const CategoriesTab = () => {
         </div>
 
         {/* Tìm kiếm & Nút hành động */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Ô tìm kiếm */}
-          <div className="relative flex-1 sm:w-44">
+          <div className="relative w-full min-w-0 sm:w-44 sm:flex-1">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm kiếm..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="min-h-11 w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
           {/* Công tắc hiện danh mục đã ẩn */}
-          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-600 dark:text-slate-400 select-none px-2">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-              className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500"
-            />
-            <span className="hidden sm:inline">Hiện mục đã ẩn</span>
-          </label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showArchived}
+            aria-label="Hiện mục đã ẩn"
+            onClick={() => setShowArchived(value => !value)}
+            className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:flex-none ${showArchived ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}
+          >
+            <span>Hiện mục đã ẩn</span>
+            <span aria-hidden="true" className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${showArchived ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
+              <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform motion-reduce:transition-none ${showArchived ? 'translate-x-4' : ''}`} />
+            </span>
+          </button>
 
           {/* Nút "+ Thêm danh mục" */}
           {canEdit && (
             <button
               type="button"
               onClick={handleOpenCreate}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center gap-1.5 shrink-0 transition-transform active:scale-95"
+              className="min-h-11 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center gap-1.5 shrink-0 transition-transform active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Thêm mới</span>

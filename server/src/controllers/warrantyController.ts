@@ -1,3 +1,4 @@
+import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import Sale from '../models/Sale.js';
 import { WarrantyService } from '../services/warrantyService.js';
 import { determineWarrantyStatus } from '../utils/dateUtils.js';
@@ -10,6 +11,7 @@ export const getWarranties = async (req, res) => {
 
     if (groupId) {
       filter.groupId = groupId;
+      Object.assign(filter, ownDetailsFilter(req));
     } else {
       filter.ownerId = (req as any).user._id;
       filter.groupId = null;
@@ -37,7 +39,7 @@ export const getWarranties = async (req, res) => {
       const realStatus = determineWarrantyStatus(w.warrantyEnd, now);
       if (w.status !== realStatus && w.status !== 'void') {
         w.status = realStatus;
-        w.save();
+        // Avoid an unawaited background write while a payment updates this sale.
       }
     });
 

@@ -4,7 +4,7 @@
  * @param {number|string} amount Số tiền cần định dạng
  * @returns {string} Chuỗi tiền tệ định dạng tiếng Việt kèm ký hiệu đ
  */
-export const formatMoney = (amount) => {
+export const formatMoney = (amount: number | string | null | undefined): string => {
   if (amount === undefined || amount === null || isNaN(Number(amount))) {
     return '0 đ';
   }
@@ -23,7 +23,7 @@ export const formatMoney = (amount) => {
 /**
  * Định dạng rút gọn cho trục biểu đồ (ví dụ: "0 đ", "1 đ", "2 đ", "1 Tr", "500k")
  */
-export const formatShortMoney = (amount) => {
+export const formatShortMoney = (amount: number | string | null | undefined): string => {
   if (amount === undefined || amount === null || isNaN(Number(amount))) {
     return '0 đ';
   }

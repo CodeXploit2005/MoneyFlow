@@ -101,7 +101,7 @@ export const setBudget = async (req, res) => {
         amount: Math.round(Number(amount)),
         month: m,
         year: y,
-        ownerId: req.user._id,
+        ownerId: groupId ? req.group.ownerId : req.user._id,
         groupId: groupId || null
       },
       { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }

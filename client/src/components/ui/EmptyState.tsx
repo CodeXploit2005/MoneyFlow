@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText } from 'lucide-react';
+import { LucideIcon, FileText } from 'lucide-react';
 import { Button } from './Button';
 
 /**
@@ -13,7 +13,7 @@ export const EmptyState = ({
   actionText = 'Thêm giao dịch',
   onAction,
   className = ''
-}) => {
+}: { icon?: LucideIcon; title?: string; description?: string; actionText?: string; onAction?: () => void; className?: string }) => {
   return (
     <div className={`flex flex-col items-center justify-center text-center p-6 ${className}`}>
       {/* Icon trong ô tròn */}

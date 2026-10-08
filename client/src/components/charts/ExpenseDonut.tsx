@@ -1,4 +1,6 @@
 import React from 'react';
+import { TooltipProps } from 'recharts';
+export interface ExpenseSlice { name: string; total: number; color?: string; icon?: string; percentage?: number; percent?: number; categoryId?: string }
 import {
   ResponsiveContainer,
   PieChart,
@@ -27,12 +29,12 @@ export const ExpenseDonut = ({
   data = [],
   isDark = false,
   includeCogs = false,
-  onToggleCogs = null,
+  onToggleCogs = undefined,
   className = ''
-}) => {
+}: { data?: ExpenseSlice[]; isDark?: boolean; includeCogs?: boolean; onToggleCogs?: (value: boolean) => void; className?: string }) => {
   const hasData = data && data.length > 0 && data.some((d) => d.total > 0);
 
-  const CustomTooltip = ({ active, payload }) => {
+  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
       const item = payload[0].payload;
       return (

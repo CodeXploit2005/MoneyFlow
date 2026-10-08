@@ -1,4 +1,12 @@
 import React from 'react';
+import { LucideIcon } from 'lucide-react';
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'outline' | 'secondary' | 'border' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
+  isLoading?: boolean;
+  icon?: LucideIcon;
+}
 
 /**
  * Component Button linh hoạt cho MoneyFlow
@@ -14,7 +22,7 @@ export const Button = ({
   type = 'button',
   icon: Icon,
   ...props
-}) => {
+}: ButtonProps) => {
   const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 active:scale-[0.98] select-none disabled:opacity-50 disabled:pointer-events-none';
 
   const sizeStyles = {

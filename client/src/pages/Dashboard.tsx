@@ -1,12 +1,13 @@
+import { ChartDayItem } from '../components/charts/IncomeExpenseChart';
+import { ExpenseSlice } from '../components/charts/ExpenseDonut';
+import { MonthPicker } from '../components/ui/MonthPicker';
 import React, { useState, useEffect } from 'react';
 import {
-  Calendar,
   Download,
   ArrowUpRight,
   ArrowDownLeft,
   TrendingUp,
-  ShieldCheck,
-  ChevronDown
+  ShieldCheck
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Button } from '../components/ui/Button';
@@ -30,7 +31,6 @@ export const Dashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const { selectedMonth, setSelectedMonth } = useReportPeriodStore();
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [includeCogs, setIncludeCogs] = useState(true);
 
@@ -43,14 +43,14 @@ export const Dashboard = () => {
     warrantyExpiring: 0
   });
 
-  const [dailyData, setDailyData] = useState([]);
-  const [categoryData, setCategoryData] = useState([]);
+  const [dailyData, setDailyData] = useState<ChartDayItem[]>([]);
+  const [categoryData, setCategoryData] = useState<ExpenseSlice[]>([]);
 
   // Tải dữ liệu từ API
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [, month, year] = selectedMonth.match(/Tháng (\d+), (\d+)/);
+      const [, month, year] = selectedMonth.match(/Tháng (\d+), (\d+)/)!;
       const params = { groupId: activeGroupId || undefined, month: Number(month), year: Number(year) };
       const startDate = new Date(Date.UTC(Number(year), Number(month) - 1, 1) - 7 * 3600000).toISOString();
       const endDate = new Date(Date.UTC(Number(year), Number(month), 1) - 7 * 3600000 - 1).toISOString();
@@ -76,7 +76,7 @@ export const Dashboard = () => {
 
       setDailyData(dailyRes.data || []);
       const cats = catRes.data?.categories || [];
-      setCategoryData(cats.map(item => ({...item, name: item.categoryName, percent: item.percentage})));
+      setCategoryData(cats.map((item: ExpenseSlice & { categoryName: string }) => ({...item, name: item.categoryName, percent: item.percentage})));
     } catch (err) {
       console.warn('Lỗi khi tải dữ liệu tổng quan:', err);
     } finally {
@@ -89,12 +89,11 @@ export const Dashboard = () => {
   }, [activeGroupId, includeCogs, selectedMonth]);
 
   const handleExportReport = () => {
-    const [, month, year] = selectedMonth.match(/Tháng (\d+), (\d+)/);
+    const [, month, year] = selectedMonth.match(/Tháng (\d+), (\d+)/)!;
     const url = reportApi.getExportUrl({ groupId: activeGroupId || '', startDate: `${year}-${month.padStart(2,'0')}-01`, endDate: `${year}-${month.padStart(2,'0')}-${new Date(Date.UTC(Number(year),Number(month),0)).getUTCDate()}` });
     window.open(url, '_blank');
   };
 
-  const monthOptions = Array.from({ length: 12 }, (_, i) => { const d = new Date(Date.now() + 7 * 3600000); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return `Tháng ${d.getUTCMonth() + 1}, ${d.getUTCFullYear()}`; });
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -111,40 +110,7 @@ export const Dashboard = () => {
 
         {/* Cụm công cụ bên phải */}
         <div className="flex items-center gap-2.5">
-          {/* Ô chọn tháng dạng dropdown */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowMonthDropdown(!showMonthDropdown)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-[#151C2C] border border-[#E5E7EB] dark:border-[#243044] text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] hover:border-slate-300 dark:hover:border-slate-600 transition shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-            >
-              <Calendar className="w-3.5 h-3.5 text-slate-400 stroke-[2]" />
-              <span>{selectedMonth}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
-            {showMonthDropdown && (
-              <div className="absolute right-0 top-full mt-1.5 w-44 rounded-2xl bg-white dark:bg-[#151C2C] border border-slate-200 dark:border-[#243044] shadow-xl p-1.5 space-y-1 z-30 text-xs">
-                {monthOptions.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => {
-                      setSelectedMonth(m);
-                      setShowMonthDropdown(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-xl font-medium transition ${
-                      selectedMonth === m
-                        ? 'bg-emerald-50 text-[#059669] dark:bg-emerald-950/40 dark:text-[#34D399] font-bold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1E293B]'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <MonthPicker label="Tháng tổng quan" value={`${selectedMonth.match(/Tháng (\d+), (\d+)/)![2]}-${selectedMonth.match(/Tháng (\d+), (\d+)/)![1].padStart(2, '0')}`} onChange={value => setSelectedMonth(`Tháng ${Number(value.slice(5))}, ${value.slice(0, 4)}`)} />
 
           {/* Nút "Xuất báo cáo" viền xanh lục, chữ xanh lục */}
           <Button
@@ -183,16 +149,16 @@ export const Dashboard = () => {
             <StatCard
               title="Tổng chi"
               value={formatMoney(overview.expense)}
-              subtitle="Trong tháng này"
+              subtitle={selectedMonth}
               icon={ArrowDownLeft}
               variant="expense"
             />
 
-            {/* Thẻ 3: Lãi ròng */}
+            {/* Thẻ 3: Chênh lệch thu chi */}
             <StatCard
               title="Chênh lệch thu chi"
               value={formatMoney(overview.profit)}
-              subtitle="Trong tháng này"
+              subtitle={selectedMonth}
               icon={TrendingUp}
               variant="profit"
             />

@@ -1,5 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { groupApi } from '../../api/endpoints';
+import { useSocket } from '../../hooks/useSocket';
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { MobileTabBar } from './MobileTabBar';
@@ -8,6 +11,7 @@ import { TransactionFormModal } from '../transactions/TransactionFormModal';
 import { SaleFormModal } from '../sales/SaleFormModal';
 import {
   Users,
+  Trophy,
   PieChart,
   SlidersHorizontal,
   Wallet,
@@ -30,18 +34,43 @@ import { useGroupStore } from '../../store/groupStore';
  */
 export const AppLayout = () => {
   const navigate = useNavigate();
-  const { activeGroupId } = useGroupStore();
+  const { activeGroupId, activeGroupName } = useGroupStore();
+  const location = useLocation();
+  const viewedGroupId = location.pathname.match(/^\/groups\/([^/]+)$/)?.[1];
+  const socket = useSocket(viewedGroupId || activeGroupId);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!socket) return;
+    const refresh = () => {
+      window.dispatchEvent(new Event('moneyflow:data-changed'));
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    };
+    const refreshGroups = async () => {
+      try { useGroupStore.getState().setGroups((await groupApi.getMyGroups()).data || []); setRefreshVersion(value => value + 1); refresh(); }
+      catch { /* API access is checked again on every request. */ }
+    };
+    const events = ['sale:created', 'sale:updated', 'transaction:created', 'transaction:updated', 'transaction:deleted'];
+    events.forEach(event => socket.on(event, refresh));
+    socket.on('groups:changed', refreshGroups);
+    socket.on('notification:created', refresh);
+    return () => { events.forEach(event => socket.off(event, refresh)); socket.off('groups:changed', refreshGroups); socket.off('notification:created', refresh); };
+  }, [socket, queryClient]);
 
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [successMessage, setSuccessMessage] = useState('');
   useEffect(() => { if (!successMessage) return; const timer = setTimeout(() => setSuccessMessage(''), 3500); return () => clearTimeout(timer); }, [successMessage]);
-  const saved = (message) => { setRefreshVersion(v => v + 1); setSuccessMessage(message); };
+  const saved = (message: string) => { setRefreshVersion(v => v + 1); setSuccessMessage(message); };
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [transactionType, setTransactionType] = useState('income');
+  const [transactionType, setTransactionType] = useState<'income' | 'expense'>('income');
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [showQuickActionChoice, setShowQuickActionChoice] = useState(false);
+
+  useEffect(() => {
+    setShowTransactionModal(false); setShowSaleModal(false); setShowQuickActionChoice(false);
+  }, [activeGroupId]);
 
   const handleOpenIncome = () => {
     setTransactionType('income');
@@ -64,6 +93,7 @@ export const AppLayout = () => {
     { name: 'Bảo hành', href: '/warranty', icon: ShieldCheck },
     { name: 'Khách hàng', href: '/customers', icon: Users },
     { name: 'Nhóm cộng tác', href: '/groups', icon: Users },
+    ...(activeGroupId ? [{ name: 'Xếp hạng bán hàng', href: '/leaderboard', icon: Trophy }] : []),
     { name: 'Hạn mức ngân sách', href: '/budgets', icon: SlidersHorizontal },
     { name: 'Sổ công nợ', href: '/debts', icon: Wallet },
     { name: 'Báo cáo & Phân tích', href: '/reports', icon: PieChart },
@@ -84,7 +114,11 @@ export const AppLayout = () => {
 
         {/* Vùng cuộn chính */}
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 mobile-content-spacing md:pb-8">
-          <div key={refreshVersion} className="page-enter"><Outlet /></div>
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60">
+            <span className="min-w-0 truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{activeGroupId ? `Ví nhóm · ${activeGroupName}` : 'Ví cá nhân · Dữ liệu riêng của bạn'}</span>
+            {activeGroupId && <button onClick={() => navigate('/groups')} className="shrink-0 min-h-8 text-[11px] font-semibold text-emerald-600">Quản lý nhóm</button>}
+          </div>
+          <div key={`${activeGroupId || 'personal'}:${refreshVersion}`} className="page-enter"><Outlet /></div>
         </main>
       </div>
 

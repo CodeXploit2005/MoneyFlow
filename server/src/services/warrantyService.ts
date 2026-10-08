@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { addDays, determineWarrantyStatus, getDaysRemaining } from '../utils/dateUtils.js';
 import Sale from '../models/Sale.js';
 import Transaction from '../models/Transaction.js';
@@ -36,50 +37,57 @@ export class WarrantyService {
     price?: number;
     userId: any;
   }): Promise<any> {
-    const sale: any = await Sale.findById(saleId).populate('customerId');
-    if (!sale) throw new Error('Không tìm thấy đơn bán để gia hạn');
+    const session = await mongoose.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        const sale: any = await Sale.findById(saleId).session(session).populate('customerId');
+        if (!sale || sale.status === 'void') throw new Error('Không tìm thấy đơn bán để gia hạn');
 
-    const oldEnd = new Date(sale.warrantyEnd);
-    // Nếu đơn đã hết hạn thì gia hạn tính từ thời điểm hiện tại, nếu còn hạn thì nối tiếp ngày hết hạn cũ
-    const baseDate = oldEnd < new Date() ? new Date() : oldEnd;
-    const newEnd = addDays(baseDate, additionalDays);
+        const oldEnd = new Date(sale.warrantyEnd);
+        // Nếu đơn đã hết hạn thì gia hạn tính từ thời điểm hiện tại, nếu còn hạn thì nối tiếp ngày hết hạn cũ
+        const baseDate = oldEnd < new Date() ? new Date() : oldEnd;
+        const newEnd = addDays(baseDate, additionalDays);
 
-    let transactionId = null;
+        let transactionId = null;
 
-    // Nếu gia hạn có tính phí, tự động tạo khoản THU
-    if (price > 0) {
-      const category: any = await CategoryService.getSystemCategory(userId, sale.groupId, 'income', 'Gia hạn');
+        // Nếu gia hạn có tính phí, tự động tạo khoản THU
+        if (price > 0) {
+          const category: any = await CategoryService.getSystemCategory(userId, sale.groupId, 'income', 'Gia hạn');
 
-      const tx: any = await Transaction.create({
-        type: 'income',
-        amount: price,
-        title: `Gia hạn: ${sale.productName} (+${additionalDays} ngày)`,
-        categoryId: category ? category._id : null,
-        date: new Date(),
-        counterparty: sale.customerId?.name || 'Khách hàng',
-        note: `Gia hạn bảo hành đơn ${sale._id} đến ${newEnd.toLocaleDateString('vi-VN')}`,
-        ownerId: userId,
-        groupId: sale.groupId,
-        saleId: sale._id
+          const tx: any = await Transaction.create([{
+            type: 'income',
+            amount: price,
+            title: `Gia hạn: ${sale.productName} (+${additionalDays} ngày)`,
+            categoryId: category ? category._id : null,
+            date: new Date(),
+            counterparty: sale.customerId?.name || 'Khách hàng',
+            note: `Gia hạn bảo hành đơn ${sale._id} đến ${newEnd.toLocaleDateString('vi-VN')}`,
+            ownerId: userId,
+            groupId: sale.groupId,
+            saleId: sale._id
+          }], { session });
+          transactionId = tx[0]._id;
+        }
+
+        sale.warrantyDays += Number(additionalDays);
+        sale.warrantyEnd = newEnd;
+        sale.status = determineWarrantyStatus(newEnd);
+
+        sale.renewals.push({
+          days: additionalDays,
+          price,
+          renewedAt: new Date(),
+          oldEnd,
+          newEnd,
+          transactionId
+        });
+
+        await sale.save({ session });
+        return sale;
       });
-      transactionId = tx._id;
+    } finally {
+      await session.endSession();
     }
-
-    sale.warrantyDays += Number(additionalDays);
-    sale.warrantyEnd = newEnd;
-    sale.status = determineWarrantyStatus(newEnd);
-
-    sale.renewals.push({
-      days: additionalDays,
-      price,
-      renewedAt: new Date(),
-      oldEnd,
-      newEnd,
-      transactionId
-    });
-
-    await sale.save();
-    return sale;
   }
 
   /**
@@ -98,41 +106,48 @@ export class WarrantyService {
     cost?: number;
     userId: any;
   }): Promise<any> {
-    const sale: any = await Sale.findById(saleId);
-    if (!sale) throw new Error('Không tìm thấy đơn hàng cần bảo hành');
+    const session = await mongoose.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        const sale: any = await Sale.findById(saleId).session(session);
+        if (!sale || sale.status === 'void') throw new Error('Không tìm thấy đơn hàng cần bảo hành');
 
-    let costTransactionId = null;
+        let costTransactionId = null;
 
-    // Nếu xử lý bảo hành có chi phí phát sinh, tự động ghi nhận vào khoản CHI
-    if (cost > 0) {
-      const expenseCategory: any = await CategoryService.getSystemCategory(userId, sale.groupId, 'expense', 'Chi phí bảo hành');
+        // Nếu xử lý bảo hành có chi phí phát sinh, tự động ghi nhận vào khoản CHI
+        if (cost > 0) {
+          const expenseCategory: any = await CategoryService.getSystemCategory(userId, sale.groupId, 'expense', 'Chi phí bảo hành');
 
-      const tx: any = await Transaction.create({
-        type: 'expense',
-        amount: cost,
-        title: `Chi phí xử lý bảo hành: ${sale.productName}`,
-        categoryId: expenseCategory ? expenseCategory._id : null,
-        date: new Date(),
-        counterparty: 'Bảo hành / Đổi',
-        note: `Lỗi: ${issue}. Cách xử lý: ${resolution}`,
-        ownerId: userId,
-        groupId: sale.groupId,
-        saleId: sale._id
+          const tx: any = await Transaction.create([{
+            type: 'expense',
+            amount: cost,
+            title: `Chi phí xử lý bảo hành: ${sale.productName}`,
+            categoryId: expenseCategory ? expenseCategory._id : null,
+            date: new Date(),
+            counterparty: 'Bảo hành / Đổi',
+            note: `Lỗi: ${issue}. Cách xử lý: ${resolution}`,
+            ownerId: userId,
+            groupId: sale.groupId,
+            saleId: sale._id
+          }], { session });
+          costTransactionId = tx[0]._id;
+        }
+
+        sale.claims.push({
+          date: new Date(),
+          issue,
+          resolution,
+          cost,
+          handledBy: userId,
+          costTransactionId
+        });
+
+        await sale.save({ session });
+        return sale;
       });
-      costTransactionId = tx._id;
+    } finally {
+      await session.endSession();
     }
-
-    sale.claims.push({
-      date: new Date(),
-      issue,
-      resolution,
-      cost,
-      handledBy: userId,
-      costTransactionId
-    });
-
-    await sale.save();
-    return sale;
   }
 
   /**

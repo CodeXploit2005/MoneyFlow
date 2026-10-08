@@ -1,5 +1,12 @@
 import React from 'react';
 
+export interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  action?: React.ReactNode;
+  headerBorder?: boolean;
+}
+
 /**
  * Component Card theo hệ thống thiết kế MoneyFlow
  * Bo góc lớn (rounded-2xl), viền mảnh #E5E7EB (light) / #243044 (dark)
@@ -13,7 +20,7 @@ export const Card = ({
   action,
   headerBorder = false,
   ...props
-}) => {
+}: CardProps) => {
   return (
     <div
       className={`rounded-2xl border bg-white dark:bg-[#151C2C] border-[#E5E7EB] dark:border-[#243044] shadow-[0_1px_3px_rgba(0,0,0,0.03)] dark:shadow-none transition-colors duration-200 ${className}`}

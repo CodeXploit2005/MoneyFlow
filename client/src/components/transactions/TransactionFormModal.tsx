@@ -153,7 +153,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
     }
 
     const finalCategoryId = categoryId;
-    if (!initialData?.saleId && !categories.some(c => c._id === categoryId && c.type === type)) {
+    if (!(initialData?.saleId || initialData?.debtId) && !categories.some(c => c._id === categoryId && c.type === type)) {
       setError('Vui lòng chọn danh mục phù hợp cho khoản thu / chi'); return;
     }
 
@@ -176,7 +176,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
       };
 
       if (initialData?._id) {
-        await transactionApi.update(initialData._id, initialData.saleId ? { amount: payload.amount, title: payload.title, method: payload.method, counterparty: payload.counterparty, note: payload.note, receiptUrl: payload.receiptUrl } : payload);
+        await transactionApi.update(initialData._id, (initialData.saleId || initialData.debtId) ? { amount: payload.amount, title: payload.title, method: payload.method, counterparty: payload.counterparty, note: payload.note, receiptUrl: payload.receiptUrl } : payload);
       } else {
         await transactionApi.create(payload);
       }
@@ -235,7 +235,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
         )}
 
         {/* Số tiền */}
-        <fieldset disabled={Boolean(initialData?.saleId)} className="space-y-4 disabled:opacity-70">
+        <fieldset disabled={Boolean(initialData?.saleId || initialData?.debtId)} className="space-y-4 disabled:opacity-70">
         <div>
           <label htmlFor="transaction-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Danh mục</label>
           <OptionPicker id="transaction-category" label="Chọn danh mục" value={categoryId} onChange={setCategoryId} searchable options={categories.filter(c => c.type === activeType).map(c => ({value:c._id,label:c.name,color:c.color}))} />
@@ -265,7 +265,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             </label>
             <input
               type="date"
-              disabled={Boolean(initialData?.saleId)}
+              disabled={Boolean(initialData?.saleId || initialData?.debtId)}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none"
@@ -334,6 +334,8 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             <span>Khoản tiền này đồng bộ từ đơn bán: <strong>{typeof initialData.saleId === 'object' ? initialData.saleId.productName : 'Đơn bán'}</strong></span>
           </div>
         )}
+
+        {initialData?.debtId && <p className="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">Sửa số tiền sẽ đồng bộ cả công nợ và sổ thu chi, giữ ngày thanh toán và lưu lịch sử thay đổi.</p>}
 
         {/* Đính kèm tệp ảnh / Hoá đơn */}
         <div>

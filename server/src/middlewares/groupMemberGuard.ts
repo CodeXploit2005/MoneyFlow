@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Group from '../models/Group.js';
 import GroupMember from '../models/GroupMember.js';
 import { sendError } from '../utils/response.js';
@@ -9,7 +10,9 @@ import { sendError } from '../utils/response.js';
 export const requireGroupMember = (allowedRoles = ['owner', 'admin', 'member']) => {
   return async (req, res, next) => {
     try {
-      const groupId = req.params.groupId || req.body.groupId || req.query.groupId;
+      const supplied = [req.params?.groupId, req.body?.groupId, req.query?.groupId].filter(value => value !== undefined && value !== null && value !== '');
+      if (supplied.some(value => typeof value !== 'string' || !mongoose.isValidObjectId(value)) || new Set(supplied.map(String)).size > 1) return sendError(res, 'Thông tin nhóm không hợp lệ hoặc không khớp', 400);
+      const groupId = supplied[0];
 
       if (!groupId) {
         return sendError(res, 'Thiếu thông tin mã nhóm (groupId)', 400);
@@ -51,3 +54,8 @@ export const requireGroupAdminOrOwner = requireGroupMember(['owner', 'admin']);
  * Middleware chỉ cho phép Owner của nhóm
  */
 export const requireGroupOwner = requireGroupMember(['owner']);
+
+export const requireInvitePermission = (req, res, next) => {
+  if (req.userRoleInGroup === 'member' && !req.group?.settings?.allowMemberInvite) return sendError(res, 'Chỉ chủ nhóm và quản trị viên được mời thành viên', 403);
+  next();
+};

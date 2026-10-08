@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Component Skeleton hiệu ứng tải trang mượt mà
  */
-export const Skeleton = ({ className = '', rounded = 'rounded-xl', ...props }) => {
+export const Skeleton = ({ className = '', rounded = 'rounded-xl', ...props }: React.HTMLAttributes<HTMLDivElement> & { rounded?: string }) => {
   return (
     <div
       className={`animate-pulse bg-slate-200/80 dark:bg-slate-800/80 ${rounded} ${className}`}

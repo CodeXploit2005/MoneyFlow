@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
  * Tự động đồng bộ với hệ điều hành và lưu vào localStorage
  */
 export const useTheme = () => {
-  const getInitialTheme = () => {
+  type Theme = 'light' | 'dark';
+  const getInitialTheme = (): Theme => {
     try {
       const saved = localStorage.getItem('moneyflow_theme');
       if (saved === 'dark' || saved === 'light') return saved;
@@ -17,7 +18,7 @@ export const useTheme = () => {
 
   const [theme, setThemeState] = useState(getInitialTheme);
 
-  const applyTheme = (currentTheme) => {
+  const applyTheme = (currentTheme: Theme) => {
     const root = document.documentElement;
     if (currentTheme === 'dark') {
       root.classList.add('dark');
@@ -33,7 +34,7 @@ export const useTheme = () => {
   // Lắng nghe thay đổi theme từ hệ thống nếu người dùng chưa chọn thủ công
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
+    const handleChange = (e: MediaQueryListEvent) => {
       const saved = localStorage.getItem('moneyflow_theme');
       if (!saved) {
         const newTheme = e.matches ? 'dark' : 'light';
@@ -46,7 +47,7 @@ export const useTheme = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const setTheme = (newTheme) => {
+  const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
     try {
       localStorage.setItem('moneyflow_theme', newTheme);
