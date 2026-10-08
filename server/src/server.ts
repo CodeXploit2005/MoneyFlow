@@ -1,7 +1,7 @@
 import http from 'http';
 import app from './app.js';
 import { connectDB } from './config/db.js';
-import { ENV } from './config/env.js';
+import { ENV, CLIENT_ORIGINS } from './config/env.js';
 import { initSocket } from './sockets/socketHandler.js';
 import { initWarrantyCron } from './jobs/warrantyCron.js';
 
@@ -14,14 +14,14 @@ const startServer = async () => {
   const httpServer = http.createServer(app);
 
   // Initialize WebSockets
-  initSocket(httpServer, ENV.CLIENT_URL);
+  initSocket(httpServer, CLIENT_ORIGINS);
 
   // Initialize Cron Jobs
   initWarrantyCron();
 
   httpServer.listen(ENV.PORT, () => {
     console.log(`🚀 MoneyFlow Server is running on port ${ENV.PORT} (${ENV.NODE_ENV})`);
-    console.log(`📡 Client URL allowed: ${ENV.CLIENT_URL}`);
+    console.log(`📡 Client origins allowed: ${CLIENT_ORIGINS.join(', ')}`);
   });
 };
 

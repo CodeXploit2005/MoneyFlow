@@ -35,7 +35,6 @@ const InviteSchema = new mongoose.Schema(
   }
 );
 
-InviteSchema.index({ code: 1 });
 InviteSchema.index({ groupId: 1 });
 
 export default mongoose.model('Invite', InviteSchema);

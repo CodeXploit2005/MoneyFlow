@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import routes from './routes/index.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { apiLimiter } from './middlewares/rateLimiter.js';
-import { ENV } from './config/env.js';
+import { ENV, CLIENT_ORIGINS } from './config/env.js';
 
 const app = express();
 
@@ -16,7 +16,7 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: [ENV.CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: CLIENT_ORIGINS,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

@@ -5,7 +5,7 @@ import User from '../models/User.js';
 
 let ioInstance: Server | null = null;
 
-export const initSocket = (server: any, clientUrl: string): Server => {
+export const initSocket = (server: any, clientUrl: string | string[]): Server => {
   ioInstance = new Server(server, {
     cors: {
       origin: clientUrl || 'http://localhost:5173',

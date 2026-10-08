@@ -1,6 +1,14 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Keep HTTP and Socket.IO on the same explicit origin allowlist.
+export const CLIENT_ORIGINS = [...new Set([
+  process.env.CLIENT_URL?.trim().replace(/\/+$/, ''),
+  'https://money-flow-two-ochre.vercel.app',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+].filter((origin): origin is string => Boolean(origin)))];
+
 export interface ServerEnv {
   PORT: number | string;
   NODE_ENV: string;
