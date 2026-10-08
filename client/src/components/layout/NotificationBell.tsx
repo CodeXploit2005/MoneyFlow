@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Bell, Check, CheckCheck, UserPlus, Trash2 } from 'lucide-react';
+import { Bell, Check, CheckCheck, UserPlus, Trash2, MoreHorizontal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificationApi, groupApi } from '../../api/endpoints';
@@ -7,6 +7,32 @@ import { useAuthStore } from '../../store/authStore';
 import { useGroupStore } from '../../store/groupStore';
 import { errorMessage } from '../../utils/errorMessage';
 import { Modal } from '../ui/Modal';
+
+const NotificationActions = ({ disabled, onDelete }: { disabled: boolean; onDelete: () => void }) => {
+  const [expanded, setExpanded] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!expanded) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!container.current?.contains(event.target as Node)) setExpanded(false);
+    };
+    document.addEventListener('pointerdown', dismiss);
+    return () => document.removeEventListener('pointerdown', dismiss);
+  }, [expanded]);
+  return <div ref={container} className="absolute right-1 top-1 z-10" onBlur={event => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setExpanded(false);
+  }} onKeyDown={event => {
+    if (event.key === 'Escape' && expanded) {
+      event.preventDefault(); event.stopPropagation(); setExpanded(false); trigger.current?.focus();
+    }
+  }}>
+    <button ref={trigger} type="button" disabled={disabled} aria-label="Tùy chọn thông báo" aria-expanded={expanded} onClick={() => setExpanded(value => !value)} className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 disabled:opacity-40"><MoreHorizontal className="h-4 w-4" /></button>
+    {expanded && <div className="absolute right-1 top-10 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+      <button type="button" disabled={disabled} onClick={() => { setExpanded(false); onDelete(); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-xs text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"><Trash2 className="h-3.5 w-3.5" />Xóa thông báo</button>
+    </div>}
+  </div>;
+};
 
 export const NotificationBell = () => {
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -74,7 +100,7 @@ export const NotificationBell = () => {
           {items.map((item: any) => <article key={item._id} className={`notification-item relative rounded-xl border p-3 pl-12 ${item.isRead ? 'border-slate-200 dark:border-slate-700' : 'border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20'}`}>
             <span className="notification-item-icon absolute left-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400">{item.type === 'invite' ? <UserPlus className="h-4 w-4" /> : <Bell className="h-4 w-4" />}</span>
             {!item.isRead && <span className="absolute right-12 top-5 h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-            <button type="button" disabled={!!busy} onClick={() => run(item._id, () => notificationApi.remove(item._id))} aria-label={`Xóa thông báo: ${item.title}`} title="Xóa thông báo" className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
+            <NotificationActions disabled={!!busy} onDelete={() => { void run(item._id, () => notificationApi.remove(item._id)); }} />
             <h4 className="pr-9 text-[13px] font-semibold leading-5 break-words">{item.title}</h4>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-600 dark:text-slate-300 break-words">{item.message}</p>
             <time className="mt-1 block text-[10px] text-slate-400" dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</time>
@@ -86,9 +112,8 @@ export const NotificationBell = () => {
           </article>)}
         </>}
       </div>
-      {canClearRead && !isError && <div className="border-t border-slate-200/70 dark:border-slate-700/70 px-4 py-2">
-        <button type="button" disabled={!!busy} onClick={() => run('clear-read', () => notificationApi.clearRead())} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />Dọn thông báo đã đọc</button>
-        <p className="pb-1 text-center text-[10px] text-slate-400">Giữ lại lời mời chưa xử lý</p>
+      {canClearRead && !isError && <div className="flex justify-end border-t border-slate-200/70 dark:border-slate-700/70 px-4 py-0.5">
+        <button type="button" disabled={!!busy} title="Xóa thông báo đã đọc, giữ lại lời mời chưa xử lý" onClick={() => run('clear-read', () => notificationApi.clearRead())} className="min-h-11 rounded-lg px-2 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 disabled:opacity-40">Dọn mục đã đọc</button>
       </div>}
     </Modal>
   </>;
