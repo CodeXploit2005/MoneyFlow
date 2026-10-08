@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+input[type="date"] { color-scheme: light; }
+.dark input[type="date"] { color-scheme: dark; }
+input[type="date"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
+
+:root {
+  color-scheme: light;
+  /* LIGHT MODE SPEC */
+  --color-bg-base: #F4F6F8;
+  --color-bg-card: #FFFFFF;
+  --color-bg-sidebar: #FFFFFF;
+  --color-bg-hover: #F8FAFC;
+  --color-bg-active: #ECFDF5;
+  --color-border: #E5E7EB;
+
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #64748B;
+  --color-text-muted: #94A3B8;
+
+  --color-stat-income-bg: #D1FAE5;
+  --color-stat-expense-bg: #FFE4E6;
+  --color-stat-profit-bg: #DBEAFE;
+  --color-stat-warranty-bg: #FEF3C7;
+}
+
+.dark {
+  color-scheme: dark;
+  /* DARK MODE SPEC */
+  --color-bg-base: #0B1220;
+  --color-bg-card: #151C2C;
+  --color-bg-sidebar: #111827;
+  --color-bg-hover: #1E293B;
+  --color-bg-active: rgba(16, 185, 129, 0.15);
+  --color-border: #243044;
+
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+
+  --color-stat-income-bg: rgba(16, 185, 129, 0.18);
+  --color-stat-expense-bg: rgba(244, 63, 94, 0.18);
+  --color-stat-profit-bg: rgba(59, 130, 246, 0.18);
+  --color-stat-warranty-bg: rgba(245, 158, 11, 0.18);
+}
+
+@layer base {
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary);
+  }
+
+  body {
+    font-family: 'Be Vietnam Pro', 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 250ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Số tiền hiển thị thẳng hàng */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8);
+}
+
+/* Glassmorphism helpers */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .glass {
+  background: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Safe area for mobile navigation */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+/* Motion uses transform/opacity so sheets remain responsive on mobile. */
+@keyframes sheetEnter { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheetExit { to { opacity: 0; transform: translateY(32px); } }
+@keyframes backdropEnter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdropExit { to { opacity: 0; } }
+.modal-panel { max-height: calc(100dvh - 16px); animation: sheetEnter 280ms cubic-bezier(.22,1,.36,1) both; }
+.modal-backdrop { animation: backdropEnter 220ms ease-out both; }
+.modal-closing { pointer-events: none; }
+.modal-closing .modal-panel { animation: sheetExit 180ms ease-in both; }
+.modal-closing .modal-backdrop { animation: backdropExit 180ms ease-in both; }
+.modal-body { padding-bottom: max(24px, env(safe-area-inset-bottom)); scroll-padding-bottom: 100px; }
+.modal-panel.bank-picker-sheet { max-height: min(80dvh, 640px); }
+.bank-picker-sheet .modal-body { display: flex; flex-direction: column; overflow: hidden; }
+.quick-action-sheet .modal-body { padding-top: 16px; }
+.quick-sale, .quick-secondary { transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.quick-sale:active, .quick-secondary:active { transform: scale(.98); }
+.page-enter { animation: fadeIn 220ms ease-out both; }
+.success-toast { animation: fadeIn 200ms ease-out both; }
+.form-actions { position: relative; margin: 20px -20px -24px; padding: 14px 20px max(16px, env(safe-area-inset-bottom)); background: rgba(255,255,255,.96); border-top: 1px solid var(--color-border); }
+.dark .form-actions { background: rgba(21,29,42,.96); }
+.mobile-content-spacing { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+button, a, input, select, textarea { touch-action: manipulation; }
+button:focus-visible, a:focus-visible { outline: 2px solid #10b981; outline-offset: 3px; }
+@media (hover: hover) {
+  .quick-sale:hover, .quick-secondary:hover { transform: translateY(-2px); border-color: #10b981; box-shadow: 0 8px 24px rgba(16,185,129,.08); }
+}
+@media (min-width: 640px) {
+  .modal-panel { max-height: calc(100dvh - 48px); }
+  .form-actions { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+}
+@media (max-width: 639px) {
+  .quick-action-sheet { max-width: 100%; }
+  .modal-body input, .modal-body select, .modal-body textarea { font-size: 16px; }
+  .modal-body button[type="submit"] { min-height: 46px; }
+  .form-actions > div:last-child { flex: 1; justify-content: flex-end; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

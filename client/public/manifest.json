@@ -1,0 +1,17 @@
+{
+  "name": "MoneyFlow - Quản lý Thu Chi & Bảo Hành",
+  "short_name": "MoneyFlow",
+  "description": "Quản lý dòng tiền, bán hàng tài khoản MMO và theo dõi bảo hành tiện lợi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

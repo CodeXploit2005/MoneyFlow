@@ -1,0 +1,9 @@
+server/.private-backups/
+**/.env
+**/.env.local
+**/node_modules/
+**/dist/
+artifacts/
+*.log
+**/.env.*
+!**/.env.example
