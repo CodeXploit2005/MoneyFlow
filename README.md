@@ -48,7 +48,9 @@ Tạo đơn bán và các khoản thu/giá vốn liên kết, thu thêm tiền �
 
 ### Chạy frontend và backend cùng lúc
 
-Tại thư mục gốc `Money`, chạy `npm run dev`. Lệnh này kiểm tra backend/database ở cổng 5000 trước khi bật frontend ở cổng 5173; nếu dịch vụ đang chạy thì sử dụng lại. Giữ terminal của dịch vụ đang chạy mở. Lần đầu cần `npm install` trong cả `server` và `client`, cùng cấu hình `server/.env`. Lệnh chạy chung dùng backend không watch; sau khi sửa backend hãy khởi động lại, hoặc dùng `npm run dev` riêng trong `server` để watch.
+Tại thư mục gốc `Money`, chạy `npm run dev`. Lệnh này kiểm tra backend/database ở cổng 5000 trước khi bật frontend ở cổng 5173; nếu dịch vụ đang chạy thì sử dụng lại. Giữ terminal của dịch vụ đang chạy mở. Lần đầu cần `npm install` trong cả `server` và `client`, cùng cấu hình `server/.env`. Backend do lệnh chạy chung khởi động mặc định chạy ổn định, không dừng mỗi lần lưu mã. Sau khi sửa backend, khởi động lại lệnh để áp dụng thay đổi. Khi lập trình và cần tự tải lại backend, dùng `npm run dev:watch` tại thư mục gốc; chế độ này sẽ ngắt kết nối ngắn khi lưu mã backend. Nếu dùng lại backend đã chạy từ terminal khác, chế độ chạy phụ thuộc lệnh ở terminal đó; cần dừng phiên watch cũ trước khi chuyển sang chế độ ổn định.
+
+`[vite] hmr update` là thông báo cập nhật giao diện bình thường. `ECONNREFUSED 127.0.0.1:5000` nghĩa là backend chưa nhận kết nối; `ECONNRESET` có thể xảy ra khi backend khởi động lại. Trong vài giây khởi động lại có thể xuất hiện lỗi proxy; nếu lỗi kéo dài, kiểm tra terminal backend và chạy `npm run dev` ở thư mục gốc để kiểm tra và khởi động dịch vụ còn thiếu. Không bật thêm backend nếu cổng 5000 đã có MoneyFlow hoạt động.
 
 Khi Vite báo 500 cho cả `/api` và `/socket.io`, kiểm tra terminal backend và `/api/health`: proxy không thể phục vụ khi backend dừng. Biểu đồ xếp hạng dùng cùng bộ lọc kỳ và tiêu chí với bảng, hiển thị tối đa 10 thành viên đầu; bảng bên dưới giữ đầy đủ thành viên. Lãi gộp âm hiển thị màu đỏ, tiền cá nhân ngoài nhóm không tính vào thành tích nhóm.
 

@@ -1,8 +1,58 @@
 import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import Transaction from '../models/Transaction.js';
+import Sale from '../models/Sale.js';
+import mongoose from 'mongoose';
+import { buildExcelReport, summarizeTransactions } from '../services/excelReportService.js';
 import { ReportService } from '../services/reportService.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { startOfDayVN, endOfDayVN } from '../utils/dateUtils.js';
+
+const reportScope = (req: any) => req.query.groupId
+  ? { groupId: req.query.groupId, ...ownDetailsFilter(req) }
+  : { ownerId: req.user._id, groupId: null };
+
+export const getAnnualSummary = async (req, res) => {
+  const year = Number(req.query.year);
+  if (!Number.isInteger(year) || year < 1900 || year > 9999) return sendError(res, 'Năm báo cáo không hợp lệ', 400);
+  try {
+    const scope = reportScope(req);
+    const aggregateScope = Object.fromEntries(Object.entries(scope).map(([key, value]) => [key, value ? new mongoose.Types.ObjectId(String(value)) : null]));
+    const start = new Date(`${year}-01-01T00:00:00+07:00`);
+    const end = new Date(`${year + 1}-01-01T00:00:00+07:00`);
+    const [annualTransactions, allTime] = await Promise.all([
+      Transaction.find({ ...scope, isDeleted: false, date: { $gte: start, $lt: end } }).select('date type amount').lean(),
+      Transaction.aggregate([{ $match: { ...aggregateScope, isDeleted: false } }, { $group: { _id: '$type', total: { $sum: '$amount' } } }])
+    ]);
+    const income = allTime.find(t => t._id === 'income')?.total || 0;
+    const expense = allTime.find(t => t._id === 'expense')?.total || 0;
+    return sendSuccess(res, { year, annual: summarizeTransactions(annualTransactions, year), allTime: { income, expense, net: income - expense } });
+  } catch (error) {
+    return sendError(res, 'Lỗi tổng hợp năm: ' + error.message, 500);
+  }
+};
+
+export const exportExcelReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const validDate = (value: any) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+    if ((startDate && !validDate(startDate)) || (endDate && !validDate(endDate)) || (!!startDate !== !!endDate) || (startDate && startDate > endDate)) return sendError(res, 'Khoảng ngày báo cáo không hợp lệ', 400);
+    const scope = reportScope(req);
+    const range = startDate ? { $gte: new Date(`${startDate}T00:00:00+07:00`), $lte: new Date(`${endDate}T23:59:59.999+07:00`) } : undefined;
+    const [transactions, sales] = await Promise.all([
+      Transaction.find({ ...scope, isDeleted: false, ...(range ? { date: range } : {}) }).populate('categoryId', 'name').populate('ownerId', 'name').sort({ date: 1 }).lean(),
+      Sale.find({ ...scope, status: { $ne: 'void' }, ...(range ? { soldAt: range } : {}) }).populate('customerId', 'name phone').sort({ soldAt: 1 }).lean()
+    ]);
+    const year = startDate && startDate.endsWith('-01-01') && endDate === `${startDate.slice(0, 4)}-12-31` ? Number(startDate.slice(0, 4)) : undefined;
+    const period = startDate ? `${startDate.split('-').reverse().join('/')} – ${endDate.split('-').reverse().join('/')}` : 'Toàn bộ thời gian';
+    const workbook = buildExcelReport({ transactions, sales, period, year });
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="MoneyFlow-${startDate || 'all'}-${endDate || 'time'}.xlsx"`);
+    return res.status(200).send(Buffer.from(buffer));
+  } catch (error) {
+    return sendError(res, 'Lỗi xuất Excel: ' + error.message, 500);
+  }
+};
 
 export const getOverview = async (req, res) => {
   try {

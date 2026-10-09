@@ -1,4 +1,6 @@
 import { MonthPicker } from '../components/ui/MonthPicker';
+import { OptionPicker } from '../components/ui/OptionPicker';
+import { AnnualReport } from '../components/charts/AnnualReport';
 import React, { useState, useEffect } from 'react';
 import { useGroupStore } from '../store/groupStore';
 import { reportApi, categoryApi } from '../api/endpoints';
@@ -22,6 +24,9 @@ export const Reports: React.FC = () => {
   const [categoryData, setCategoryData] = useState<CategoryPieItem[]>([]);
   const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [exportScope, setExportScope] = useState('month');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -49,9 +54,13 @@ export const Reports: React.FC = () => {
     loadData();
   }, [activeGroupId, selectedMonth]);
 
-  const handleExport = () => {
-    const url = reportApi.getExportUrl({ groupId: activeGroupId || '', startDate, endDate });
-    window.open(url, '_blank');
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError('');
+    const dates = exportScope === 'all' ? {} : exportScope === 'year' ? { startDate: `${selectedYear}-01-01`, endDate: `${selectedYear}-12-31` } : { startDate, endDate };
+    try { await reportApi.downloadExcel({ groupId: activeGroupId || '', ...dates }); }
+    catch { setExportError('Không xuất được Excel. Vui lòng thử lại.'); }
+    finally { setExporting(false); }
   };
 
   if (loading) {
@@ -74,11 +83,24 @@ export const Reports: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2"><div className="w-48"><MonthPicker label="Tháng báo cáo" value={`${selectedYear}-${selectedMonthNumber.padStart(2, '0')}`} onChange={value => setSelectedMonth(`Tháng ${Number(value.slice(5))}, ${value.slice(0, 4)}`)} className="w-full" /></div><Button variant="primary" size="sm" onClick={handleExport}>
+        <div className="flex flex-wrap items-center gap-2"><div className="w-48"><MonthPicker label="Tháng báo cáo" value={`${selectedYear}-${selectedMonthNumber.padStart(2, '0')}`} onChange={value => setSelectedMonth(`Tháng ${Number(value.slice(5))}, ${value.slice(0, 4)}`)} className="w-full" /></div><Button variant="primary" size="sm" onClick={handleExport} isLoading={exporting} disabled={exporting}>
           <Download className="w-4 h-4 mr-1.5" />
-          Tải file CSV Excel
+          Xuất Excel (.xlsx)
         </Button></div>
       </div>
+      {exportError && <p role="alert" className="text-sm text-rose-600">{exportError}</p>}
+
+      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+        <span>Phạm vi xuất Excel</span>
+        <div className="w-52"><OptionPicker label="Phạm vi xuất Excel" value={exportScope} onChange={setExportScope} options={[
+          { value: 'month', label: selectedMonth },
+          { value: 'year', label: `Cả năm ${selectedYear}` },
+          { value: 'all', label: 'Toàn bộ thời gian' }
+        ]} /></div>
+        <span>5 tab: Tổng quan · Đơn bán · Khách hàng · Sản phẩm · Thu chi</span>
+      </div>
+
+      <AnnualReport year={Number(selectedYear)} groupId={activeGroupId} />
 
       {/* Monthly Financial Performance */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

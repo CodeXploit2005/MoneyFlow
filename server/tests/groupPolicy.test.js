@@ -35,7 +35,7 @@ test.before(async () => {
 });
 test.after(async () => { if (server) await new Promise(resolve => server.close(resolve)); await mongoose.disconnect(); await db?.stop(); });
 test('Outsiders cannot list, read, export or rank another group', async () => {
- for (const path of [`/groups/${group._id}`, `/sales?groupId=${group._id}`, `/sales/${ownerSale._id}`, `/transactions?groupId=${group._id}`, `/reports/export-csv?groupId=${group._id}`, `/leaderboard/${group._id}`]) assert.equal((await request(outsider, path)).status, 403, path);
+ for (const path of [`/groups/${group._id}`, `/sales?groupId=${group._id}`, `/sales/${ownerSale._id}`, `/transactions?groupId=${group._id}`, `/reports/export-csv?groupId=${group._id}`, `/reports/export-excel?groupId=${group._id}`, `/reports/annual-summary?groupId=${group._id}&year=2026`, `/leaderboard/${group._id}`]) assert.equal((await request(outsider, path)).status, 403, path);
 });
 test('Private details apply across sales, warranties, activity, transactions and CSV while shared aggregates remain available', async () => {
  const sales = await request(member, `/sales?groupId=${group._id}`); assert.equal(sales.status, 200); assert.deepEqual(sales.data.sales.map(item => item.productName), ['Member item']);

@@ -5,7 +5,9 @@ import {
   getCategoryBreakdown,
   getTopProducts,
   getSmartInsights,
-  exportTransactionsCsv
+  exportTransactionsCsv,
+  exportExcelReport,
+  getAnnualSummary
 } from '../controllers/reportController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { requireGroupMember } from '../middlewares/groupMemberGuard.js';
@@ -27,5 +29,7 @@ router.get('/category-breakdown', optionalGroupGuard, getCategoryBreakdown);
 router.get('/top-products', optionalGroupGuard, getTopProducts);
 router.get('/insights', optionalGroupGuard, getSmartInsights);
 router.get('/export-csv', optionalGroupGuard, exportTransactionsCsv);
+router.get('/export-excel', optionalGroupGuard, exportExcelReport);
+router.get('/annual-summary', optionalGroupGuard, getAnnualSummary);
 
 export default router;

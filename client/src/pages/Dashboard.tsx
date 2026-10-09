@@ -33,6 +33,8 @@ export const Dashboard = () => {
   const { selectedMonth, setSelectedMonth } = useReportPeriodStore();
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [includeCogs, setIncludeCogs] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   // Dữ liệu tổng quan
   const [overview, setOverview] = useState({
@@ -88,10 +90,13 @@ export const Dashboard = () => {
     loadDashboardData();
   }, [activeGroupId, includeCogs, selectedMonth]);
 
-  const handleExportReport = () => {
+  const handleExportReport = async () => {
+    setExporting(true);
+    setExportError('');
     const [, month, year] = selectedMonth.match(/Tháng (\d+), (\d+)/)!;
-    const url = reportApi.getExportUrl({ groupId: activeGroupId || '', startDate: `${year}-${month.padStart(2,'0')}-01`, endDate: `${year}-${month.padStart(2,'0')}-${new Date(Date.UTC(Number(year),Number(month),0)).getUTCDate()}` });
-    window.open(url, '_blank');
+    try { await reportApi.downloadExcel({ groupId: activeGroupId || '', startDate: `${year}-${month.padStart(2,'0')}-01`, endDate: `${year}-${month.padStart(2,'0')}-${new Date(Date.UTC(Number(year),Number(month),0)).getUTCDate()}` }); }
+    catch { setExportError('Không xuất được Excel. Vui lòng thử lại.'); }
+    finally { setExporting(false); }
   };
 
 
@@ -117,13 +122,16 @@ export const Dashboard = () => {
             variant="outline"
             size="sm"
             onClick={handleExportReport}
+            isLoading={exporting}
+            disabled={exporting}
             className="rounded-xl px-3.5 py-2 font-medium"
           >
             <Download className="w-3.5 h-3.5 mr-1.5 stroke-[2.2]" />
-            Xuất báo cáo
+            Xuất Excel
           </Button>
         </div>
       </div>
+      {exportError && <p role="alert" className="text-sm text-rose-600">{exportError}</p>}
 
       {/* 2. Hàng 4 thẻ thống kê (StatCard): Lưới 4 cột trên desktop */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

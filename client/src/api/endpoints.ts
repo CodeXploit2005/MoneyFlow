@@ -1,5 +1,4 @@
 import api from './axios';
-import { API_URL } from './config';
 
 // Auth APIs
 export const authApi = {
@@ -174,6 +173,7 @@ export const leaderboardApi = {
 
 // Report APIs
 export const reportApi = {
+  getAnnualSummary: async (params?: any) => api.get('/reports/annual-summary', { params }),
   getOverview: async (params?: any) => {
     return api.get('/reports/overview', { params });
   },
@@ -189,10 +189,16 @@ export const reportApi = {
   getInsights: async (params?: any) => {
     return api.get('/reports/insights', { params });
   },
-  getExportUrl: (params?: any) => {
-    const query = new URLSearchParams(params).toString();
-    const token = localStorage.getItem('moneyflow_token');
-    return `${API_URL}/reports/export-csv?${query}&token=${token}`;
+  downloadExcel: async (params?: any) => {
+    const blob = await api.get('/reports/export-excel', { params, responseType: 'blob', timeout: 120000 }) as unknown as Blob;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `MoneyFlow-${params?.startDate || 'all'}-${params?.endDate || 'time'}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 };
 

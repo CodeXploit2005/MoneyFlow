@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import net from 'node:net';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const watchBackend = process.argv.includes('--watch');
 const children = [];
 let stopping = false;
 function stop(code = 0) {
@@ -42,8 +43,10 @@ try {
   if (await health()) console.log('Reusing healthy MoneyFlow backend on :5000.');
   else {
     if (await listening(5000)) throw new Error('Port 5000 is occupied or the database is unavailable. Check the backend terminal.');
-    launch('server', 'node_modules/tsx/dist/cli.mjs', ['src/server.ts']);
-    const deadline = Date.now() + 30000;
+    launch('server', 'node_modules/tsx/dist/cli.mjs', watchBackend
+      ? ['watch', '--clear-screen=false', 'src/server.ts']
+      : ['src/server.ts']);
+    const deadline = Date.now() + 120000;
     while (!stopping && !(await health())) {
       if (Date.now() > deadline) throw new Error('Backend startup failed. Check MongoDB configuration and the error above.');
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -52,6 +55,8 @@ try {
   if (!stopping) {
     if (await listening(5173)) console.log('Frontend already listening on http://localhost:5173.');
     else launch('client', 'node_modules/vite/bin/vite.js', ['--host', '--strictPort']);
-    console.log('MoneyFlow: http://localhost:5173 — keep this terminal open.');
+    console.log(children.length
+      ? `MoneyFlow: http://localhost:5173 — keep this terminal open. Backend ${watchBackend ? 'watch mode (connections briefly drop on source changes)' : 'stable mode (restart this command after backend changes)'}.`
+      : 'MoneyFlow: http://localhost:5173 — services already running; keep their original terminals open.');
   }
 } catch (error) { console.error(error.message); stop(1); }
