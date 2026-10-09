@@ -4,6 +4,7 @@ import { useGroupStore } from '../store/groupStore';
 import { useAuthStore } from '../store/authStore';
 import { saleApi } from '../api/endpoints';
 import { SaleFormModal } from '../components/sales/SaleFormModal';
+import { SaleNotes } from '../components/sales/SaleNotes';
 import { RenewModal } from '../components/warranty/RenewModal';
 import { ClaimModal } from '../components/warranty/ClaimModal';
 import { VietQRModal } from '../components/ui/VietQRModal';
@@ -144,7 +145,7 @@ export const Sales: React.FC = () => {
                 <div key={sale._id} className="p-4 sm:p-5 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     {/* Left details */}
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-extrabold text-base text-slate-900 dark:text-slate-100">
                           {sale.quantity > 1 ? `${sale.quantity}x ` : ''}{sale.productName}
@@ -168,11 +169,7 @@ export const Sales: React.FC = () => {
                         <span>Người bán: {ownerName}</span>
                       </div>
 
-                      {sale.notes && (
-                        <div className="mt-2 text-xs font-mono p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 max-w-xl truncate">
-                          {sale.notes}
-                        </div>
-                      )}
+                      {sale.notes && <SaleNotes notes={sale.notes} productName={sale.productName} customerName={custName || 'Khách'} />}
                     </div>
 
                     {/* Right Price & Actions */}
