@@ -62,7 +62,12 @@ api.interceptors.response.use(
         return Promise.reject(new Error(refreshError.response?.data?.message || refreshError.message || 'Không thể làm mới phiên. Vui lòng thử lại.'));
       }
     }
-    const message = error.response?.data?.message || error.message || 'Lỗi kết nối máy chủ';
+    const message = error.response?.data?.message ||
+      (['ECONNABORTED', 'ETIMEDOUT'].includes(error.code)
+        ? 'Máy chủ phản hồi quá lâu. Vui lòng thử lại sau ít phút.'
+        : error.code === 'ERR_NETWORK'
+          ? 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'
+          : error.message) || 'Lỗi kết nối máy chủ';
     return Promise.reject(new Error(message));
   }
 );

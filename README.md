@@ -6,9 +6,10 @@
 
 Yêu cầu Node.js 20+ và MongoDB replica set (hoặc MongoDB Atlas). Replica set cần cho các thao tác đồng bộ có transaction, gồm đặt lại mật khẩu, sửa tiền liên kết đơn bán và xóa nhóm.
 
-1. Trong server: chạy npm ci, copy .env.example thành .env, cấu hình MongoDB và các khóa JWT ngẫu nhiên riêng, sau đó npm run dev.
-2. Trong client: chạy npm ci, copy .env.example thành .env nếu cần thay API URL, sau đó npm run dev.
-3. Mở http://localhost:5173 và đăng ký tài khoản thật. Không tự tạo dữ liệu mẫu khi khởi động.
+1. Trong server: chạy npm ci, copy .env.example thành .env, cấu hình MongoDB và các khóa JWT ngẫu nhiên riêng.
+2. Trong client: chạy npm ci, copy .env.example thành .env nếu cần thay API URL.
+3. Tại thư mục gốc Money chạy npm run dev để khởi động backend và chờ database sẵn sàng trước khi bật frontend. Giữ terminal mở.
+4. Mở http://localhost:5173 và đăng ký tài khoản thật. Không tự tạo dữ liệu mẫu khi khởi động.
 
 Không đưa .env, khóa bí mật hoặc bản sao database lên Git. Khi triển khai, cấu hình CLIENT_URL và VITE_API_URL theo địa chỉ thực tế, dùng HTTPS và database bền vững. Mã nguồn này không tự triển khai lên hosting khi push GitHub.
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { authApi } from '../api/endpoints';
+import { waitForBackend } from '../api/readiness';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { BankPicker } from '../components/ui/BankPicker';
@@ -34,6 +35,7 @@ export const Login = () => {
 
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
   // Form states
@@ -46,10 +48,14 @@ export const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
 
     try {
+      setStatus('Đang kết nối máy chủ… Lần đầu sau thời gian nghỉ có thể mất khoảng 1 phút.');
+      await waitForBackend();
+      setStatus(isRegisterMode ? 'Đang tạo tài khoản…' : 'Đang đăng nhập…');
       if (isRegisterMode) {
         const selectedBank = VIET_BANKS.find(b => b.code === bankCode);
         const res = await authApi.register({
@@ -73,6 +79,7 @@ export const Login = () => {
       setError(err.message || 'Thao tác không thành công');
     } finally {
       setLoading(false);
+      setStatus('');
     }
   };
 
@@ -323,6 +330,7 @@ export const Login = () => {
               </div>
             )}
 
+            {loading && <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{status}</p>}
             <Button
               type="submit"
               variant="primary"

@@ -7,9 +7,9 @@ const axios=require('axios');
 const memory=new Map();
 globalThis.localStorage={getItem:key=>memory.get(key)??null,setItem:(key,value)=>memory.set(key,String(value)),removeItem:key=>memory.delete(key)};
 globalThis.window={location:{origin:'http://localhost',pathname:'/sales'}};
-const result=await build({stdin:{contents:"export { default as api } from './src/api/axios'; export { useAuthStore } from './src/store/authStore';",resolveDir:new URL('..',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1')},bundle:true,write:false,platform:'node',format:'cjs',external:['axios','zustand','react'],define:{'import.meta.env':JSON.stringify({DEV:true})}});
+const result=await build({stdin:{contents:"export { waitForBackend } from './src/api/readiness'; export { default as api } from './src/api/axios'; export { useAuthStore } from './src/store/authStore';",resolveDir:new URL('..',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1')},bundle:true,write:false,platform:'node',format:'cjs',external:['axios','zustand','react'],define:{'import.meta.env':JSON.stringify({DEV:true})}});
 const compiled=new Module(new URL('./auth-fixture.cjs',import.meta.url).pathname);compiled.filename=require.resolve('../package.json');compiled.paths=require.resolve.paths('axios');compiled._compile(result.outputFiles[0].text,compiled.filename);
-const {api,useAuthStore}=compiled.exports;
+const {api,useAuthStore,waitForBackend}=compiled.exports;
 const jwt=seconds=>'header.'+Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+seconds})).toString('base64url')+'.signature';
 const response=(config,data)=>({config,data,status:200,statusText:'OK',headers:{}});
 const failure=(config,status)=>Promise.reject(new axios.AxiosError('Request failed',undefined,config,undefined,{config,status,data:{message:'Unauthorized'},headers:{},statusText:'Error'}));
@@ -29,7 +29,7 @@ test('Concurrent 401 requests retry only once and share refresh',async()=>{
 test('Network refresh failure preserves login',async()=>{
  const old=jwt(-10);login(old);
  axios.defaults.adapter=config=>Promise.reject(new axios.AxiosError('Network unavailable','ERR_NETWORK',config));
- await assert.rejects(api.get('/sales'),/Network unavailable/);assert.equal(memory.get('moneyflow_token'),old);assert.equal(useAuthStore.getState().isAuthenticated,true);
+ await assert.rejects(api.get('/sales'),/Không kết nối được máy chủ/);assert.equal(memory.get('moneyflow_token'),old);assert.equal(useAuthStore.getState().isAuthenticated,true);
 });
 test('Revoked refresh expires the session',async()=>{
  login(jwt(-10));axios.defaults.adapter=config=>failure(config,401);
@@ -45,4 +45,19 @@ test('A second unauthorized response terminates retry without a refresh loop',as
  axios.defaults.adapter=async config=>{refreshes++;return response(config,{data:{accessToken:jwt(900)}});};
  api.defaults.adapter=config=>{requests++;return failure(config,401);};
  await assert.rejects(api.get('/sales'),/hết hạn/);assert.equal(refreshes,1);assert.equal(requests,2);assert.equal(useAuthStore.getState().isAuthenticated,false);
+});
+
+test('Readiness wakes with GET only and checks database before login',async()=>{
+ let calls=0;
+ axios.defaults.adapter=async config=>{
+  calls++;assert.equal(config.method,'get');assert.equal(config.url,'/api/health');
+  assert.equal(config.withCredentials,false);
+  return response(config,{app:'MoneyFlow API',status:calls===1?'unavailable':'healthy'});
+ };
+ await waitForBackend();assert.equal(calls,2);
+});
+
+test('Readiness does not retry rate limited requests',async()=>{
+ let calls=0;axios.defaults.adapter=config=>{calls++;return failure(config,429);};
+ await assert.rejects(waitForBackend(),/Quá nhiều yêu cầu/);assert.equal(calls,1);
 });

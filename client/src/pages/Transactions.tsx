@@ -1,6 +1,8 @@
 import { Pagination } from '../components/ui/Pagination';
 import { OptionPicker } from '../components/ui/OptionPicker';
+import { CompactDateInput } from '../components/ui/CompactDateInput';
 import React, { useState, useEffect, useRef } from 'react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useGroupStore } from '../store/groupStore';
 import { useAuthStore } from '../store/authStore';
@@ -47,6 +49,10 @@ export const Transactions: React.FC = () => {
   const [keyword, setKeyword] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const now = new Date();
+  const today = format(now, 'yyyy-MM-dd');
+  const monthStart = format(startOfMonth(now), 'yyyy-MM-dd');
+  const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
   const [includeDeleted, setIncludeDeleted] = useState<boolean>(false);
 
   // Modals
@@ -320,6 +326,7 @@ export const Transactions: React.FC = () => {
             <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
               <button
                 type="button"
+                aria-pressed={!startDate && !endDate}
                 onClick={() => { setStartDate(''); setEndDate(''); }}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
                   !startDate && !endDate
@@ -331,13 +338,13 @@ export const Transactions: React.FC = () => {
               </button>
               <button
                 type="button"
+                aria-pressed={startDate === today && endDate === today}
                 onClick={() => {
-                  const today = new Date().toISOString().split('T')[0];
                   setStartDate(today);
                   setEndDate(today);
                 }}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
-                  startDate && startDate === endDate
+                  startDate === today && endDate === today
                     ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                 }`}
@@ -346,15 +353,13 @@ export const Transactions: React.FC = () => {
               </button>
               <button
                 type="button"
+                aria-pressed={startDate === monthStart && endDate === monthEnd}
                 onClick={() => {
-                  const now = new Date();
-                  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-                  setStartDate(firstDay);
-                  setEndDate(lastDay);
+                  setStartDate(monthStart);
+                  setEndDate(monthEnd);
                 }}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
-                  startDate && !startDate.includes(endDate) && startDate.endsWith('-01')
+                  startDate === monthStart && endDate === monthEnd
                     ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                 }`}
@@ -365,34 +370,17 @@ export const Transactions: React.FC = () => {
           </div>
 
           {/* Ô nhập ngày có nhãn "Từ ngày" - "Đến ngày" rõ ràng */}
-          <div className="flex w-full sm:w-auto min-w-0 items-center gap-2">
-            <div className="flex flex-1 sm:flex-none min-w-0 items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
-              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Từ:</span>
-              <input
-                type="date"
-                aria-label="Lọc từ ngày"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full sm:w-32 min-w-0 bg-transparent text-xs text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
-              />
-            </div>
-            <span className="text-slate-400 font-bold">-</span>
-            <div className="flex flex-1 sm:flex-none min-w-0 items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
-              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Đến:</span>
-              <input
-                type="date"
-                aria-label="Lọc đến ngày"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full sm:w-32 min-w-0 bg-transparent text-xs text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
-              />
-            </div>
+          <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:gap-2">
+            <CompactDateInput label="Từ:" ariaLabel="Lọc từ ngày" value={startDate} onChange={setStartDate} />
+            <span aria-hidden="true" className="shrink-0 text-slate-400 font-bold">-</span>
+            <CompactDateInput label="Đến:" ariaLabel="Lọc đến ngày" value={endDate} onChange={setEndDate} />
             {(startDate || endDate) && (
               <button
                 type="button"
                 onClick={() => { setStartDate(''); setEndDate(''); }}
                 title="Xóa bộ lọc ngày"
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                aria-label="Xóa bộ lọc ngày"
+                className="shrink-0 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

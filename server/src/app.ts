@@ -59,7 +59,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // Main API Routes
-app.use('/api', routes);
+app.use('/api', (_req, res, next) => {
+  if (!getDatabaseStatus().connected) {
+    res.setHeader('Retry-After', '5');
+    res.status(503).json({ success: false, message: 'Máy chủ đang kết nối lại cơ sở dữ liệu. Vui lòng thử lại sau ít phút.' });
+    return;
+  }
+  next();
+}, routes);
 
 // Global Error Handler
 app.use(errorHandler);
