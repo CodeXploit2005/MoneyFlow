@@ -1,3 +1,5 @@
+import Customer from '../models/Customer.js';
+import { searchPattern, textSearch } from '../utils/search.js';
 import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import Sale from '../models/Sale.js';
 import { WarrantyService } from '../services/warrantyService.js';
@@ -6,7 +8,11 @@ import { sendSuccess, sendError } from '../utils/response.js';
 
 export const getWarranties = async (req, res) => {
   try {
-    const { groupId, status, month, year }: any = req.query;
+    const { groupId, status, month, year, keyword }: any = req.query;
+    const paginated = req.query.page !== undefined || req.query.limit !== undefined;
+    const page = Number(req.query.page ?? 1), limit = Number(req.query.limit ?? 20);
+    if (paginated && (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100)) return sendError(res, 'Trang và số mục mỗi trang không hợp lệ (tối đa 100)', 400);
+    if (keyword !== undefined && (typeof keyword !== 'string' || keyword.length > 200)) return sendError(res, 'Từ khóa tối đa 200 ký tự', 400);
     const filter: any = {};
 
     if (groupId) {
@@ -15,6 +21,16 @@ export const getWarranties = async (req, res) => {
     } else {
       filter.ownerId = (req as any).user._id;
       filter.groupId = null;
+    }
+
+    const scope = { ...filter };
+    const terms = typeof keyword === 'string' ? keyword.trim().split(/\s+/).filter(Boolean) : [];
+    if (terms.length) {
+      filter.$and = await Promise.all(terms.map(async term => {
+        const pattern = searchPattern(term);
+        const customers = await Customer.find({ ...scope, ...textSearch(['name', 'phone', 'zalo', 'email'], pattern) }).select('_id');
+        return { $or: [...textSearch(['productName', 'notes'], pattern).$or, { customerId: { $in: customers.map(customer => customer._id) } }] };
+      }));
     }
 
     if (status) {
@@ -28,10 +44,12 @@ export const getWarranties = async (req, res) => {
       filter.warrantyEnd = { $gte: start, $lte: end };
     }
 
-    const warranties = await Sale.find(filter)
+    const query = Sale.find(filter)
       .populate('customerId', 'name phone zalo email')
       .populate('ownerId', 'name avatar')
-      .sort({ warrantyEnd: 1 });
+      .sort({ warrantyEnd: 1, _id: 1 });
+    if (paginated) query.skip((page - 1) * limit).limit(limit);
+    const [warranties, total] = await Promise.all([query, paginated ? Sale.countDocuments(filter) : Promise.resolve(0)]);
 
     // Cập nhật lại status theo thời điểm thực tế
     const now = new Date();
@@ -43,7 +61,7 @@ export const getWarranties = async (req, res) => {
       }
     });
 
-    return sendSuccess(res, warranties);
+    return sendSuccess(res, paginated ? { warranties, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } } : warranties);
   } catch (error) {
     return sendError(res, 'Lỗi lấy danh sách bảo hành: ' + error.message, 500);
   }

@@ -57,8 +57,8 @@ export const Reports: React.FC = () => {
   const handleExport = async () => {
     setExporting(true);
     setExportError('');
-    const dates = exportScope === 'all' ? {} : exportScope === 'year' ? { startDate: `${selectedYear}-01-01`, endDate: `${selectedYear}-12-31` } : { startDate, endDate };
-    try { await reportApi.downloadExcel({ groupId: activeGroupId || '', ...dates }); }
+    const dates = exportScope === 'all' ? {} : ['year', 'annual-detailed'].includes(exportScope) ? { startDate: `${selectedYear}-01-01`, endDate: `${selectedYear}-12-31` } : { startDate, endDate };
+    try { await reportApi.downloadExcel({ groupId: activeGroupId || '', ...dates, ...(exportScope === 'annual-detailed' ? { layout: 'annual-detailed' } : {}) }); }
     catch { setExportError('Không xuất được Excel. Vui lòng thử lại.'); }
     finally { setExporting(false); }
   };
@@ -95,9 +95,11 @@ export const Reports: React.FC = () => {
         <div className="w-52"><OptionPicker label="Phạm vi xuất Excel" value={exportScope} onChange={setExportScope} options={[
           { value: 'month', label: selectedMonth },
           { value: 'year', label: `Cả năm ${selectedYear}` },
+          { value: 'annual-detailed', label: `Năm ${selectedYear} · 12 tháng chi tiết` },
           { value: 'all', label: 'Toàn bộ thời gian' }
         ]} /></div>
-        <span>5 tab: Tổng quan · Đơn bán · Khách hàng · Sản phẩm · Thu chi</span>
+        {exportScope === 'annual-detailed' ? <span>Thêm 2 trang: 12 tháng · Chi tiết cả năm</span> : <span>5 trang tính: Tổng quan · Đơn bán · Khách hàng · Sản phẩm · Thu chi</span>}
+        <p className="w-full text-xs leading-relaxed">{exportScope === 'annual-detailed' ? `Năm ${selectedYear}: số khách mua, số đơn, số lượng và tổng tiền từng tháng 1–12; chi tiết ngày bán, khách và sản phẩm trong cùng file.` : exportScope === 'year' ? `Xuất toàn bộ năm ${selectedYear} (01/01–31/12): tổng thu/chi, doanh thu và lãi gộp 12 tháng, khách hàng cùng sản phẩm đã bán.` : exportScope === 'all' ? 'Xuất toàn bộ dữ liệu và tổng hợp theo từng tháng.' : 'Xuất dữ liệu của tháng đang chọn. Chọn “Cả năm” ở trên để lấy báo cáo năm.'} Tiền đã thu và còn nợ theo đơn phản ánh trạng thái hiện tại.</p>
       </div>
 
       <AnnualReport year={Number(selectedYear)} groupId={activeGroupId} />

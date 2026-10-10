@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { OptionPicker } from '../components/ui/OptionPicker';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGroupStore } from '../store/groupStore';
 import { customerApi } from '../api/endpoints';
 import { Modal } from '../components/ui/Modal';
@@ -22,6 +23,16 @@ export const Customers: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [keyword, setKeyword] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [sort, setSort] = useState('newest');
+  const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
+  const [listError, setListError] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setSearchTerm(keyword.trim()); setPage(1); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [keyword]);
 
   // Customer Detail Modal
   const [selectedCustDetail, setSelectedCustDetail] = useState<Customer | null>(null);
@@ -38,27 +49,37 @@ export const Customers: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState('');
 
+  const searchRequest = useRef(0);
   const loadCustomers = async () => {
+    const requestId = ++searchRequest.current;
     setLoading(true);
+    setListError('');
     try {
       const res = await customerApi.getAll({
         groupId: activeGroupId || undefined,
-        keyword: keyword || undefined
+        keyword: searchTerm || undefined, page, limit: pageSize, sort
       });
+      if (requestId !== searchRequest.current) return;
       const rawData = res.data as any;
       const list = Array.isArray(rawData) ? rawData : (rawData?.customers || []);
       setCustomers(list);
-    } catch (e) {
-      console.error(e);
+      setPagination(rawData?.pagination || { total: list.length, totalPages: 1 });
+      if (page > 1 && rawData?.pagination?.totalPages < page) setPage(Math.max(1, rawData.pagination.totalPages));
+    } catch (e: any) {
+      if (requestId === searchRequest.current) setListError(e.message || 'Không thể tải danh sách khách hàng');
     } finally {
-      setLoading(false);
+      if (requestId === searchRequest.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadCustomers();
-  }, [activeGroupId, keyword]);
+    return () => { searchRequest.current++; };
+  }, [activeGroupId, searchTerm, page, pageSize, sort]);
+
+  useEffect(() => { setPage(1); }, [activeGroupId]);
 
   const handleOpenDetail = async (cust: Customer) => {
     setSelectedCustDetail(cust);
@@ -75,6 +96,7 @@ export const Customers: React.FC = () => {
   };
 
   const handleOpenAdd = () => {
+    setSaveError('');
     setEditingCust(null);
     setName('');
     setPhone('');
@@ -85,6 +107,7 @@ export const Customers: React.FC = () => {
   };
 
   const handleOpenEdit = (cust: Customer) => {
+    setSaveError('');
     setEditingCust(cust);
     setName(cust.name);
     setPhone(cust.phone || '');
@@ -98,6 +121,7 @@ export const Customers: React.FC = () => {
     e.preventDefault();
     if (!name.trim()) return;
 
+    setSaveError('');
     setActionLoading(true);
     try {
       const payload: Partial<Customer> = {
@@ -118,7 +142,7 @@ export const Customers: React.FC = () => {
       setShowModal(false);
       loadCustomers();
     } catch (err: any) {
-      alert(err.message);
+      setSaveError(err.message);
     } finally {
       setActionLoading(false);
     }
@@ -156,18 +180,24 @@ export const Customers: React.FC = () => {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm flex items-center">
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-wrap items-center gap-3">
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
-            type="text"
+            type="search"
+            aria-label="Tìm khách hàng"
+            maxLength={200}
             placeholder="Tìm theo tên khách, số điện thoại, zalo, email..."
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs bg-white dark:bg-slate-800 dark:border-slate-700 text-slate-900 dark:text-slate-100"
           />
         </div>
+        <div className="w-full sm:w-40"><OptionPicker label="Sắp xếp khách hàng" value={sort} onChange={value => { setSort(value); setPage(1); }} options={[{ value: 'newest', label: 'Mới nhất' }, { value: 'name_asc', label: 'Tên A–Z' }, { value: 'name_desc', label: 'Tên Z–A' }]} /></div>
+        <div className="w-full sm:w-44"><OptionPicker label="Số khách mỗi trang" value={String(pageSize)} onChange={value => { setPageSize(Number(value)); setPage(1); }} options={[25, 50, 100].map(size => ({ value: String(size), label: `${size} khách / trang` }))} /></div>
       </div>
+      {listError && <div role="alert" className="text-sm text-rose-600">{listError} <button type="button" onClick={() => void loadCustomers()} className="underline">Thử lại</button></div>}
+      <p aria-live="polite" className="text-sm text-slate-500">{pagination.total.toLocaleString('vi-VN')} khách hàng{searchTerm ? ` phù hợp với “${searchTerm}”` : ''}</p>
 
       {/* Grid Customers */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -177,7 +207,7 @@ export const Customers: React.FC = () => {
           </div>
         ) : customers.length === 0 ? (
           <div className="col-span-full py-20 text-center text-slate-400 text-sm">
-            Chưa có khách hàng nào. Hãy thêm khách hàng đầu tiên!
+            {searchTerm ? 'Không tìm thấy khách phù hợp. Thử tên, SĐT hoặc email khác.' : 'Chưa có khách hàng nào. Hãy thêm khách hàng đầu tiên!'}
           </div>
         ) : (
           customers.map((cust) => (
@@ -187,14 +217,16 @@ export const Customers: React.FC = () => {
             >
               <div>
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 font-black flex items-center justify-center text-sm">
                       {cust.name.slice(0, 1).toUpperCase()}
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 break-words">
                         {cust.name}
                       </h3>
+                      <p className="text-[11px] text-slate-400 font-mono" title={cust._id}>Hồ sơ: {cust._id.slice(-8).toUpperCase()}</p>
+                      {cust.email && <p className="text-xs text-slate-500 break-all">{cust.email}</p>}
                       {cust.phone && (
                         <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
                           <Phone className="w-3 h-3" />
@@ -249,6 +281,15 @@ export const Customers: React.FC = () => {
             </div>
           ))
         )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
+        <span>{pagination.total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, pagination.total)} / ${pagination.total} khách` : '0 khách'}</span>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" size="sm" disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}>Trước</Button>
+          <span>Trang {page} / {Math.max(1, pagination.totalPages)}</span>
+          <Button variant="secondary" size="sm" disabled={loading || page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>Sau</Button>
+        </div>
       </div>
 
       {/* Customer Detail Modal */}
@@ -325,7 +366,9 @@ export const Customers: React.FC = () => {
         maxWidth="max-w-md"
       >
         <form onSubmit={handleSaveCustomer} className="space-y-4">
+          {saveError && <p role="alert" className="text-sm text-rose-600">{saveError}</p>}
           <Input
+            maxLength={160}
             label="Họ và tên khách hàng *"
             placeholder="Ví dụ: Nguyễn Văn A"
             value={name}

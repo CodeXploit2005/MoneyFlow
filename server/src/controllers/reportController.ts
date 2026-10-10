@@ -44,7 +44,10 @@ export const exportExcelReport = async (req, res) => {
     ]);
     const year = startDate && startDate.endsWith('-01-01') && endDate === `${startDate.slice(0, 4)}-12-31` ? Number(startDate.slice(0, 4)) : undefined;
     const period = startDate ? `${startDate.split('-').reverse().join('/')} – ${endDate.split('-').reverse().join('/')}` : 'Toàn bộ thời gian';
-    const workbook = buildExcelReport({ transactions, sales, period, year });
+    const annualDetailed = req.query.layout === 'annual-detailed';
+    if (req.query.layout && !annualDetailed) return sendError(res, 'Kiểu báo cáo không hợp lệ', 400);
+    if (annualDetailed && !year) return sendError(res, 'Báo cáo năm chi tiết cần chọn đủ ngày 01/01–31/12 của một năm', 400);
+    const workbook = buildExcelReport({ transactions, sales, period, year, annualDetailed });
     const buffer = await workbook.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="MoneyFlow-${startDate || 'all'}-${endDate || 'time'}.xlsx"`);

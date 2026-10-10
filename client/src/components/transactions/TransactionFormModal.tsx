@@ -1,14 +1,15 @@
+import { CustomerSearch } from '../customers/CustomerSearch';
 import { OptionPicker } from '../ui/OptionPicker';
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { MoneyInput } from '../ui/MoneyInput';
-import { transactionApi, categoryApi, customerApi } from '../../api/endpoints';
+import { transactionApi, categoryApi } from '../../api/endpoints';
 import { useGroupStore } from '../../store/groupStore';
 import { useAuthStore } from '../../store/authStore';
 import { Image as ImageIcon, Upload, Trash2, Tag, ShieldCheck, UserCheck } from 'lucide-react';
-import { Category, Transaction, Customer } from '../../types';
+import { Category, Transaction } from '../../types';
 
 interface TransactionFormModalProps {
   isOpen: boolean;
@@ -44,7 +45,6 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   const [error, setError] = useState<string>('');
 
   // Khách hàng có sẵn (để gợi ý nhanh)
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [showCustPicker, setShowCustPicker] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,17 +61,6 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   useEffect(() => {
     if (!categories.some(c => c._id === categoryId && c.type === type)) setCategoryId(categories.find(c => c.type === type)?._id || '');
   }, [categories, type, categoryId]);
-
-  const loadCustomers = async () => {
-    try {
-      const res = await customerApi.getAll({ groupId: activeGroupId || undefined, limit: 100 });
-      const rawData = res.data as any;
-      const list = Array.isArray(rawData) ? rawData : (rawData?.customers || []);
-      setCustomers(list);
-    } catch (e) {
-      console.warn('Lỗi nạp danh sách khách hàng:', e);
-    }
-  };
 
   useEffect(() => {
     const safeType: 'income' | 'expense' = (defaultType === 'expense' ? 'expense' : 'income');
@@ -104,7 +93,6 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
         setCategoryId(matched?._id || '');
       }
       loadCategories();
-      loadCustomers();
     }
   }, [isOpen, defaultType, initialData, activeGroupId]);
 
@@ -286,40 +274,22 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
               {activeType === 'income' ? 'Khách hàng / Người thanh toán (tùy chọn)' : 'Người nhận tiền / Nhà cung cấp (tùy chọn)'}
             </label>
-            {customers.length > 0 && (
+            {(
               <button
                 type="button"
                 onClick={() => setShowCustPicker(!showCustPicker)}
                 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <UserCheck className="w-3.5 h-3.5" />
-                {showCustPicker ? 'Đóng danh sách khách' : `+ Chọn từ ${customers.length} khách có sẵn`}
+                {showCustPicker ? 'Đóng danh sách khách' : 'Chọn khách có sẵn'}
               </button>
             )}
           </div>
 
-          {showCustPicker && customers.length > 0 && (
-            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                Nhấn chọn nhanh khách hàng:
-              </span>
-              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-                {customers.map((c) => (
-                  <button
-                    key={c._id}
-                    type="button"
-                    onClick={() => {
-                      setCounterparty(c.phone ? `${c.name} (${c.phone})` : c.name);
-                      setShowCustPicker(false);
-                    }}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 hover:border-emerald-500 hover:text-emerald-600 transition cursor-pointer"
-                  >
-                    {c.name} {c.phone ? `• ${c.phone}` : ''}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {showCustPicker && <CustomerSearch groupId={activeGroupId} onSelect={customer => {
+            setCounterparty(customer.phone ? `${customer.name} (${customer.phone})` : customer.name);
+            setShowCustPicker(false);
+          }} />}
 
           <Input
             placeholder="Tên khách hàng, SĐT hoặc đối tác..."

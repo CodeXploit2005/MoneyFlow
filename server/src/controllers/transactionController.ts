@@ -1,3 +1,5 @@
+import { cleanCustomerName, cleanCustomerPhone, customerContactFilter } from '../utils/customerIdentity.js';
+import { searchPattern, textSearch } from '../utils/search.js';
 import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import Category from '../models/Category.js';
@@ -22,6 +24,8 @@ export const getTransactions = async (req, res) => {
       page = 1,
       limit = 20
     } = req.query;
+
+    if (!Number.isSafeInteger(Number(page)) || Number(page) < 1 || !Number.isSafeInteger(Number(limit)) || Number(limit) < 1 || Number(limit) > 100) return sendError(res, 'Trang và số mục mỗi trang không hợp lệ (tối đa 100)', 400);
 
     const filter: any = {};
 
@@ -78,14 +82,8 @@ export const getTransactions = async (req, res) => {
       if (maxAmount) filter.amount.$lte = Number(maxAmount);
     }
 
-    // Keyword search (title, note, counterparty)
-    if (keyword) {
-      filter.$or = [
-        { title: { $regex: keyword, $options: 'i' } },
-        { note: { $regex: keyword, $options: 'i' } },
-        { counterparty: { $regex: keyword, $options: 'i' } }
-      ];
-    }
+    const pattern = searchPattern(keyword);
+    if (pattern) Object.assign(filter, textSearch(['title', 'note', 'counterparty'], pattern));
 
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -98,7 +96,7 @@ export const getTransactions = async (req, res) => {
           select: 'productName warrantyDays warrantyEnd status price customerId',
           populate: { path: 'customerId', select: 'name phone' }
         })
-        .sort({ date: -1, createdAt: -1 })
+        .sort({ date: -1, createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(Number(limit)),
       Transaction.countDocuments(filter)
@@ -219,12 +217,12 @@ export const createTransaction = async (req, res) => {
             parsedPhone = match[2].trim();
           }
 
+          parsedName = cleanCustomerName(parsedName);
+          parsedPhone = cleanCustomerPhone(parsedPhone);
+          const contact = customerContactFilter(parsedPhone, '');
           const existingCust = await Customer.findOne({
-            ownerId: req.user._id,
-            $or: [
-              { name: parsedName },
-              ...(parsedPhone ? [{ phone: parsedPhone }] : [])
-            ]
+            ...(groupId ? { groupId } : { ownerId: req.user._id, groupId: null }),
+            ...(contact || { name: parsedName, phone: '' })
           });
 
           if (!existingCust) {

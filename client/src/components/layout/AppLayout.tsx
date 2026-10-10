@@ -106,20 +106,27 @@ export const AppLayout = () => {
       <Sidebar isCollapsed={isSidebarCollapsed} />
 
       {/* 2. Vùng nội dung bên phải (Topbar + Main Content) */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         <Topbar
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebarCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
 
-        {/* Vùng cuộn chính */}
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 mobile-content-spacing md:pb-8">
+        {/* Desktop quick-add occupies its own column, outside the page content. */}
+        <div className="flex flex-1 min-w-0 items-start">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 mobile-content-spacing">
           <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60">
             <span className="min-w-0 truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{activeGroupId ? `Ví nhóm · ${activeGroupName}` : 'Ví cá nhân · Dữ liệu riêng của bạn'}</span>
             {activeGroupId && <button onClick={() => navigate('/groups')} className="shrink-0 min-h-8 text-[11px] font-semibold text-emerald-600">Quản lý nhóm</button>}
           </div>
           <div key={`${activeGroupId || 'personal'}:${refreshVersion}`} className="page-enter"><Outlet /></div>
         </main>
+        <aside aria-label="Thêm nhanh" className="hidden md:flex sticky top-16 h-[calc(100dvh-4rem)] w-20 lg:w-24 shrink-0 self-start items-end justify-center pb-8">
+          <button type="button" onClick={() => setShowQuickActionChoice(prev => !prev)} aria-label="Thêm nhanh" title="Thêm nhanh" aria-haspopup="dialog" aria-expanded={showQuickActionChoice} className={`w-12 h-12 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center text-white transition-all duration-300 ease-out active:scale-95 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-4 dark:focus-visible:ring-offset-slate-950 ${showQuickActionChoice ? 'bg-slate-800 dark:bg-slate-700 shadow-lg rotate-45' : 'bg-gradient-to-tr from-emerald-600 to-emerald-400 shadow-lg shadow-emerald-500/30 hover:brightness-110 hover:scale-105 hover:shadow-xl'}`}>
+            <Plus aria-hidden="true" className="w-6 h-6 lg:w-7 lg:h-7" />
+          </button>
+        </aside>
+        </div>
       </div>
 
       {/* 3. Thanh điều hướng di động với nút (+) xoay ở chính giữa */}
@@ -128,23 +135,6 @@ export const AppLayout = () => {
         onToggleQuickAdd={() => { setShowMobileMore(false); setShowQuickActionChoice((prev) => !prev); }}
         isQuickAddOpen={showQuickActionChoice}
       />
-
-      {/* 4. Nút "+" nổi trên Desktop (ẩn trên Mobile vì đã nằm ngay chính giữa TabBar) */}
-      <div className="hidden md:block fixed bottom-8 right-8 z-40">
-        <button
-          type="button"
-          onClick={() => setShowQuickActionChoice((prev) => !prev)}
-          title={showQuickActionChoice ? 'Đóng menu' : 'Thêm giao dịch nhanh'}
-          aria-label={showQuickActionChoice ? 'Đóng menu' : 'Thêm giao dịch nhanh'}
-          className={`group w-14 h-14 rounded-2xl flex items-center justify-center active:scale-95 transition-all duration-300 ease-out cursor-pointer focus:outline-none ${
-            showQuickActionChoice
-              ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-lg rotate-45'
-              : 'bg-gradient-to-tr from-[#059669] via-emerald-500 to-[#10B981] hover:brightness-110 text-white shadow-xl shadow-emerald-500/35 hover:scale-110 hover:ring-4 hover:ring-emerald-400/40 hover:shadow-2xl hover:shadow-emerald-500/60 rotate-0'
-          }`}
-        >
-<Plus className="w-7 h-7 stroke-[2.5]" />
-        </button>
-      </div>
 
       <Modal
         isOpen={showQuickActionChoice}

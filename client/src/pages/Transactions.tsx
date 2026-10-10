@@ -1,3 +1,4 @@
+import { Pagination } from '../components/ui/Pagination';
 import { OptionPicker } from '../components/ui/OptionPicker';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -74,8 +75,22 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  const searchRequest = useRef(0);
+  const previousFilters = useRef('');
+  const listRef = useRef<HTMLDivElement>(null);
+  const [listError, setListError] = useState('');
   const loadTransactions = async () => {
+    const filterKey = JSON.stringify([activeGroupId, type, selectedCategoryIds, keyword, startDate, endDate, includeDeleted]);
+    const filtersChanged = previousFilters.current !== filterKey;
+    previousFilters.current = filterKey;
+    const requestId = ++searchRequest.current;
     setLoading(true);
+    setListError('');
+    if (filtersChanged && pagination.page !== 1) {
+      setPagination(p => ({ ...p, page: 1 }));
+      return;
+    }
+    const requestPage = pagination.page;
     try {
       const res = await transactionApi.getAll({
         groupId: activeGroupId || undefined,
@@ -85,16 +100,22 @@ export const Transactions: React.FC = () => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         includeDeleted: includeDeleted ? 'true' : 'false',
-        page: pagination.page,
-        limit: 20
+        page: requestPage,
+        limit: pagination.limit
       });
 
+      if (requestId !== searchRequest.current) return;
+      const next = res.data?.pagination || { page: requestPage, limit: pagination.limit, total: 0, totalPages: 0 };
+      if (requestPage > Math.max(1, next.totalPages)) {
+        setPagination({ ...next, page: Math.max(1, next.totalPages) });
+        return;
+      }
       setTransactions(res.data?.transactions || []);
-      setPagination(res.data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 });
-    } catch (e) {
-      console.error(e);
+      setPagination(next);
+    } catch (e: any) {
+      if (requestId === searchRequest.current) setListError(e.message || 'Không thể tải dữ liệu. Vui lòng thử lại.');
     } finally {
-      setLoading(false);
+      if (requestId === searchRequest.current) setLoading(false);
     }
   };
 
@@ -117,7 +138,8 @@ export const Transactions: React.FC = () => {
 
   useEffect(() => {
     loadTransactions();
-  }, [activeGroupId, type, selectedCategoryIds, keyword, startDate, endDate, includeDeleted, pagination.page]);
+    return () => { searchRequest.current++; };
+  }, [activeGroupId, type, selectedCategoryIds, keyword, startDate, endDate, includeDeleted, pagination.page, pagination.limit]);
 
   const handleDelete = async (id: string) => {
     const transaction = transactions.find(tx => tx._id === id);
@@ -142,6 +164,12 @@ export const Transactions: React.FC = () => {
     } catch (e: any) {
       alert(e.message);
     }
+  };
+
+  const changePage = (page: number) => {
+    setPagination(p => ({ ...p, page }));
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    listRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
   };
 
   return (
@@ -184,7 +212,7 @@ export const Transactions: React.FC = () => {
               type="text"
               placeholder="Tìm kiếm theo tên, ghi chú..."
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={(e) => { setKeyword(e.target.value); setPagination(p => ({ ...p, page: 1 })); }}
               className="w-full min-h-11 pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 text-slate-900 dark:text-slate-100"
             />
           </div>
@@ -374,8 +402,10 @@ export const Transactions: React.FC = () => {
       </div>
 
       {/* Transactions List */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-        {loading ? (
+      <div ref={listRef} className="scroll-mt-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+        {listError ? (
+          <div role="alert" className="py-16 px-4 text-center text-sm text-rose-600 dark:text-rose-400">{listError} <button type="button" onClick={() => void loadTransactions()} className="underline font-semibold">Thử lại</button></div>
+        ) : loading ? (
           <div className="py-20 text-center text-xs text-slate-400">
             Đang tải dữ liệu giao dịch...
           </div>
@@ -587,32 +617,7 @@ export const Transactions: React.FC = () => {
           </>
         )}
 
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">
-              Trang {pagination.page} / {pagination.totalPages} ({pagination.total} giao dịch)
-            </span>
-            <div className="flex gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagination.page <= 1}
-                onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
-              >
-                Trước
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-              >
-                Sau
-              </Button>
-            </div>
-          </div>
-        )}
+        <Pagination {...pagination} loading={loading} noun="giao dịch" onPageChange={changePage} onLimitChange={limit => setPagination(p => ({ ...p, page: 1, limit }))} />
       </div>
 
       {/* Transaction Modal */}

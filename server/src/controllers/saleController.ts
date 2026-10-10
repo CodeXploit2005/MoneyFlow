@@ -1,3 +1,5 @@
+import { cleanCustomerName, cleanCustomerPhone, customerContactFilter } from '../utils/customerIdentity.js';
+import { searchPattern, textSearch } from '../utils/search.js';
 import Group from '../models/Group.js';
 import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import mongoose from 'mongoose';
@@ -25,6 +27,8 @@ export const getSales = async (req, res) => {
       limit = 20
     } = req.query;
 
+    if (!Number.isSafeInteger(Number(page)) || Number(page) < 1 || !Number.isSafeInteger(Number(limit)) || Number(limit) < 1 || Number(limit) > 100) return sendError(res, 'Trang và số mục mỗi trang không hợp lệ (tối đa 100)', 400);
+
     const filter: any = {};
 
     if (groupId) {
@@ -39,11 +43,11 @@ export const getSales = async (req, res) => {
     if (paymentStatus) filter.paymentStatus = paymentStatus;
     if (customerId) filter.customerId = customerId;
 
-    if (keyword) {
-      filter.$or = [
-        { productName: { $regex: keyword, $options: 'i' } },
-        { notes: { $regex: keyword, $options: 'i' } }
-      ];
+    const pattern = searchPattern(keyword);
+    if (pattern) {
+      const scope = groupId ? { groupId, ...ownDetailsFilter(req) } : { ownerId: req.user._id, groupId: null };
+      const customers = await Customer.find({ ...scope, ...textSearch(['name', 'phone', 'zalo', 'email'], pattern) }).select('_id');
+      filter.$or = [...textSearch(['productName', 'notes'], pattern).$or, { customerId: { $in: customers.map(customer => customer._id) } }];
     }
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -52,7 +56,7 @@ export const getSales = async (req, res) => {
       Sale.find(filter)
         .populate('customerId', 'name phone zalo email')
         .populate('ownerId', 'name avatar')
-        .sort({ soldAt: -1, createdAt: -1 })
+        .sort({ soldAt: -1, createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(Number(limit)),
       Sale.countDocuments(filter)
@@ -134,6 +138,12 @@ export const createSale = async (req, res) => {
 
     // Nếu tạo khách mới ngay trong form bán
     if (!finalCustomerId && newCustomer && newCustomer.name) {
+      if (typeof newCustomer.name !== 'string' || !cleanCustomerName(newCustomer.name) || cleanCustomerName(newCustomer.name).length > 160) return sendError(res, 'Tên khách hàng phải có từ 1 đến 160 ký tự', 400);
+      if ([newCustomer.phone, newCustomer.email, newCustomer.zalo].some(value => value !== undefined && typeof value !== 'string')) return sendError(res, 'Thông tin liên hệ không hợp lệ', 400);
+      const normalizedPhone = cleanCustomerPhone(newCustomer.phone || '');
+      if (normalizedPhone && !/^\+?\d{7,15}$/.test(normalizedPhone)) return sendError(res, 'Số điện thoại phải có từ 7 đến 15 chữ số', 400);
+      const contact = customerContactFilter(normalizedPhone, (newCustomer.email || '').trim().toLowerCase());
+      if (contact && await Customer.exists({ ...(groupId ? { groupId } : { ownerId: req.user._id, groupId: null }), ...contact })) return sendError(res, 'SĐT hoặc email đã có trong danh bạ. Hãy chọn khách hàng có sẵn.', 409);
       const createdCust = await Customer.create({
         name: newCustomer.name,
         phone: newCustomer.phone || '',

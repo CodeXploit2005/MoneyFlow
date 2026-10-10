@@ -9,7 +9,7 @@ export const useSocket = (groupId: string | null = null): Socket | null => {
   const token = useAuthStore(state => state.token);
   useEffect(() => {
     if (!token) { setSocket(null); return; }
-    const connection = io(SOCKET_URL, { auth: { token }, transports: ['polling', 'websocket'], reconnectionDelay: 2000, reconnectionDelayMax: 15000 });
+    const connection = io(SOCKET_URL, { auth: { token }, transports: ['websocket', 'polling'], tryAllTransports: true, reconnectionDelay: 2000, reconnectionDelayMax: 15000 });
     setSocket(connection);
     return () => { connection.disconnect(); };
   }, [token]);

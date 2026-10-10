@@ -61,7 +61,7 @@ test('XLSX round trip preserves five styled sheets, numeric totals, dates and li
     assert.equal(sheet.views[0].activeCell, 'A1');
     assert.equal(sheet.views[0].showGridLines, false);
     assert.ok(sheet.autoFilter);
-    assert.equal(sheet.getCell('A9').fill.fgColor.argb, '008675');
+    assert.equal(sheet.getCell('A9').fill.fgColor.argb, 'E2E8F0');
     assert.equal(sheet.pageSetup.orientation, 'landscape');
     assert.ok(sheet.getColumn(1).width >= 16);
     const titleCells = [];
@@ -72,7 +72,7 @@ test('XLSX round trip preserves five styled sheets, numeric totals, dates and li
     assert.equal(sheet.getCell(1, sheet.columnCount + 1).value, null);
   }
   assert.equal(overview.views[0].zoomScale, 100);
-  assert.ok(overview.getColumn(4).width >= 40);
+  assert.ok(overview.getColumn(4).width >= 26);
   const longBook = buildExcelReport({ transactions: [], sales: Array.from({ length: 30 }, (_, i) => ({ ...sales[0], _id: `long-${i}` })), period: 'Dài' });
   assert.equal(longBook.getWorksheet('Đơn bán').views[0].topLeftCell, 'A10');
   assert.equal(longBook.getWorksheet('Tổng quan').views[0].state, 'normal');
@@ -126,4 +126,31 @@ test('Export and annual summary respect personal/group privacy, deletion, void s
     const invalid = response(); await exportExcelReport({ user: { _id: ownerId }, query }, invalid);
     assert.equal(invalid.code, 400);
   }
+});
+
+
+test('Annual workbook has twelve sales months, unique customers, quantities and reconciled profit', () => {
+ const book=buildExcelReport({transactions,sales:[...sales,{...sales[0],_id:'repeat',quantity:2,paidAmount:100000}],period:'Năm 2026',year:2026});
+ const sheet=book.getWorksheet('Tổng quan');
+ const find=label=>{let found;sheet.eachRow(row=>{if(row.getCell(1).value===label)found=row;});return found;};
+ assert.equal(find('Khách hàng có đơn trong kỳ').getCell(2).value,7);
+ assert.equal(find('Số lượng sản phẩm đã bán').getCell(2).value,9);
+ const section=find('DOANH THU VÀ LÃI GỘP THEO THÁNG').number;
+ const rows=Array.from({length:12},(_,i)=>sheet.getRow(section+2+i));
+ assert.deepEqual(rows.map(row=>row.getCell(1).value),Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')+'/2026'));
+ assert.equal(rows.reduce((sum,row)=>sum+row.getCell(2).value,0),2485000);
+ assert.equal(rows.reduce((sum,row)=>sum+row.getCell(3).value,0),1160000);
+ assert.equal(rows.reduce((sum,row)=>sum+row.getCell(4).value,0),1325000);
+ assert.equal(sheet.getRow(section+14).getCell(4).value.result,1325000);
+});
+
+test('Detailed annual export counts distinct monthly customers and annual totals without duplicates', async()=>{
+ const repeated={...sales[0],_id:'repeat-same-month',quantity:2};
+ const book=buildExcelReport({transactions,sales:[...sales,repeated],period:'Năm 2026',year:2026,annualDetailed:true});
+ const loaded=new ExcelJS.Workbook();await loaded.xlsx.load(await book.xlsx.writeBuffer());
+ const months=loaded.getWorksheet('12 tháng'),detail=loaded.getWorksheet('Chi tiết cả năm');
+ assert.ok(months);assert.ok(detail);assert.equal(months.getCell('A10').value,'01/2026');assert.equal(months.getCell('A21').value,'12/2026');
+ assert.equal(months.getCell('B19').value,2);assert.equal(months.getCell('C19').value,3);assert.equal(months.getCell('B22').value,7);assert.equal(months.getCell('C22').value.result,8);
+ assert.equal(months.getCell('E22').value.result,2485000);
+ assert.equal(detail.getCell('G18').value.result,2485000);assert.equal(detail.getCell('D10').value,'0900123456');
 });

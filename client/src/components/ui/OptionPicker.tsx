@@ -4,7 +4,7 @@ import { Check, ChevronDown, Search } from 'lucide-react';
 import { Modal } from './Modal';
 export interface PickerOption { value: string; label: string; color?: string }
 const normalize = (text: string) => text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g,'d');
-export const OptionPicker = ({ value, onChange, options, label, searchable = false, id }: { value: string; onChange: (value: string) => void; options: PickerOption[]; label: string; searchable?: boolean; id?: string }) => {
+export const OptionPicker = ({ value, onChange, options, label, searchable = false, id, disabled = false }: { value: string; onChange: (value: string) => void; options: PickerOption[]; label: string; searchable?: boolean; id?: string; disabled?: boolean }) => {
   const [open, setOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [query, setQuery] = useState('');
@@ -14,13 +14,25 @@ export const OptionPicker = ({ value, onChange, options, label, searchable = fal
   const choose = (next: string) => { onChange(next); setOpen(false); trigger.current?.focus(); };
   useEffect(() => {
     if (!open || mobile) return;
-    popup.current?.querySelector<HTMLInputElement>('input')?.focus();
+    const initialFocus = popup.current?.querySelector<HTMLElement>('input, button[aria-pressed="true"]') || popup.current?.querySelector<HTMLElement>('button');
+    initialFocus?.focus();
     const outside = (event: PointerEvent) => { if (!popup.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node)) setOpen(false); };
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); trigger.current?.focus(); } };
+    const arrows = (event: KeyboardEvent) => {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || event.target instanceof HTMLInputElement) return;
+      const buttons = Array.from(popup.current?.querySelectorAll<HTMLButtonElement>('button') || []);
+      if (!buttons.length) return;
+      event.preventDefault();
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length;
+      buttons[next]?.focus();
+    };
+    popup.current?.addEventListener('keydown', arrows);
+    const panel = popup.current;
     const resize = () => setOpen(false);
     const scroll = (event: Event) => { if (!popup.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener('pointerdown', outside); window.addEventListener('keydown', escape, true); window.addEventListener('resize', resize); window.addEventListener('scroll', scroll, true);
-    return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('keydown', escape, true); window.removeEventListener('resize', resize); window.removeEventListener('scroll', scroll, true); };
+    return () => { panel?.removeEventListener('keydown', arrows); document.removeEventListener('pointerdown', outside); window.removeEventListener('keydown', escape, true); window.removeEventListener('resize', resize); window.removeEventListener('scroll', scroll, true); };
   }, [open, mobile]);
   const filtered = options.filter(option => normalize(option.label).includes(normalize(query)));
   const content = <div className="flex min-h-0 flex-col">
@@ -33,12 +45,12 @@ export const OptionPicker = ({ value, onChange, options, label, searchable = fal
     </div>
   </div>;
   return <>
-    <button ref={trigger} id={id} type="button" aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => {
+    <button ref={trigger} id={id} disabled={disabled} type="button" aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => {
       const rect = trigger.current!.getBoundingClientRect(); const width = Math.min(Math.max(rect.width, 260), window.innerWidth - 24);
       setMobile(window.matchMedia('(max-width: 639px)').matches); setQuery('');
       setPosition({ position:'fixed', width, left:Math.max(12,Math.min(rect.left,window.innerWidth-width-12)), ...(window.innerHeight-rect.bottom < 330 && rect.top > 330 ? {bottom:window.innerHeight-rect.top+8} : {top:rect.bottom+8}) }); setOpen(!open);
-    }} className="w-full min-h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30">
-      <span className="flex-1 text-left truncate">{options.find(option=>option.value===value)?.label || 'Chọn lựa chọn'}</span><ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />
+    }} className="disabled:opacity-50 disabled:cursor-not-allowed hover:border-emerald-500/50 transition-colors w-full min-h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30">
+      <span className="flex-1 text-left truncate">{options.find(option=>option.value===value)?.label || 'Chọn lựa chọn'}</span><ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
     <Modal isOpen={open && mobile} onClose={() => setOpen(false)} title={label} maxWidth="max-w-md">{content}</Modal>
     {open && !mobile && createPortal(<div ref={popup} role="dialog" aria-label={label} style={position} className="z-[210] p-2.5 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151D2A] text-slate-900 dark:text-slate-100">{content}</div>,document.body)}

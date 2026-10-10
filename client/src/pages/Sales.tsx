@@ -1,5 +1,6 @@
+import { Pagination } from '../components/ui/Pagination';
 import { PaymentStatusPicker } from '../components/ui/PaymentStatusPicker';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGroupStore } from '../store/groupStore';
 import { useAuthStore } from '../store/authStore';
 import { saleApi } from '../api/endpoints';
@@ -28,6 +29,7 @@ export const Sales: React.FC = () => {
   const { activeGroupId, myRoleInActiveGroup } = useGroupStore();
 
   const [sales, setSales] = useState<Sale[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState<boolean>(true);
   const [keyword, setKeyword] = useState<string>('');
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -44,31 +46,54 @@ export const Sales: React.FC = () => {
   const [payError, setPayError] = useState('');
   const [payLoading, setPayLoading] = useState<boolean>(false);
 
+  const searchRequest = useRef(0);
+  const previousFilters = useRef('');
+  const listRef = useRef<HTMLDivElement>(null);
+  const [listError, setListError] = useState('');
   const loadSales = async () => {
+    const filterKey = JSON.stringify([activeGroupId, keyword, paymentStatus]);
+    const filtersChanged = previousFilters.current !== filterKey;
+    previousFilters.current = filterKey;
+    const requestId = ++searchRequest.current;
     setLoading(true);
+    setListError('');
+    if (filtersChanged && pagination.page !== 1) {
+      setPagination(p => ({ ...p, page: 1 }));
+      return;
+    }
+    const requestPage = pagination.page;
     try {
       const res = await saleApi.getAll({
         groupId: activeGroupId || undefined,
         keyword: keyword || undefined,
-        paymentStatus: paymentStatus || undefined
+        paymentStatus: paymentStatus || undefined,
+        page: requestPage, limit: pagination.limit
       });
+      if (requestId !== searchRequest.current) return;
+      const next = res.data?.pagination || { page: requestPage, limit: pagination.limit, total: 0, totalPages: 0 };
+      if (requestPage > Math.max(1, next.totalPages)) {
+        setPagination({ ...next, page: Math.max(1, next.totalPages) });
+        return;
+      }
       setSales(res.data?.sales || []);
-    } catch (e) {
-      console.error(e);
+      setPagination(next);
+    } catch (e: any) {
+      if (requestId === searchRequest.current) setListError(e.message || 'Không thể tải dữ liệu. Vui lòng thử lại.');
     } finally {
-      setLoading(false);
+      if (requestId === searchRequest.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadSales();
-  }, [activeGroupId, keyword, paymentStatus]);
+    return () => { searchRequest.current++; };
+  }, [activeGroupId, keyword, paymentStatus, pagination.page, pagination.limit]);
 
   useEffect(() => {
     const refresh = () => { void loadSales(); };
     window.addEventListener('moneyflow:data-changed', refresh);
     return () => window.removeEventListener('moneyflow:data-changed', refresh);
-  }, [activeGroupId, keyword, paymentStatus]);
+  }, [activeGroupId, keyword, paymentStatus, pagination.page, pagination.limit]);
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +111,12 @@ export const Sales: React.FC = () => {
     } finally {
       setPayLoading(false);
     }
+  };
+
+  const changePage = (page: number) => {
+    setPagination(p => ({ ...p, page }));
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    listRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
   };
 
   return (
@@ -114,7 +145,7 @@ export const Sales: React.FC = () => {
           <input
             type="text"
             aria-label="Tìm đơn bán"
-            placeholder="Tìm theo tên sản phẩm, thông tin bàn giao..."
+            placeholder="Tìm sản phẩm, tên khách, SĐT hoặc ghi chú…"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             className="w-full min-h-11 pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 text-base sm:text-sm bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
@@ -125,11 +156,13 @@ export const Sales: React.FC = () => {
       </div>
 
       {/* Sales List */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-        {loading ? (
+      <div ref={listRef} className="scroll-mt-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+        {listError ? (
+          <div role="alert" className="py-16 px-4 text-center text-sm text-rose-600 dark:text-rose-400">{listError} <button type="button" onClick={() => void loadSales()} className="underline font-semibold">Thử lại</button></div>
+        ) : loading ? (
           <div className="py-20 text-center text-xs text-slate-400">Đang tải danh sách đơn bán...</div>
         ) : sales.length === 0 ? (
-          <div className="py-20 text-center text-slate-400 text-sm">Chưa có đơn bán hàng nào</div>
+          <div className="py-20 text-center text-slate-400 text-sm">{keyword || paymentStatus ? 'Không tìm thấy đơn phù hợp với bộ lọc.' : 'Chưa có đơn bán hàng nào'}</div>
         ) : (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {sales.map((sale) => {
@@ -242,6 +275,7 @@ export const Sales: React.FC = () => {
             })}
           </div>
         )}
+        <Pagination {...pagination} loading={loading} noun="đơn bán" onPageChange={changePage} onLimitChange={limit => setPagination(p => ({ ...p, page: 1, limit }))} />
       </div>
 
       {/* Sale Form Modal */}

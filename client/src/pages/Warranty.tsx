@@ -1,6 +1,8 @@
+import { Pagination } from '../components/ui/Pagination';
+import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { SaleNotes } from '../components/sales/SaleNotes';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGroupStore } from '../store/groupStore';
 import { warrantyApi } from '../api/endpoints';
 import { RenewModal } from '../components/warranty/RenewModal';
@@ -26,41 +28,66 @@ export const Warranty: React.FC = () => {
   const canEdit = (sale: Sale) => !activeGroupId || (typeof sale.ownerId === 'object' ? sale.ownerId?._id : sale.ownerId) === userId || ['owner', 'admin'].includes(myRoleInActiveGroup || '');
 
   const [allWarranties, setWarranties] = useState<Sale[]>([]);
-  const [keyword, setKeyword] = useState('');
+  const [searchParams] = useSearchParams();
+  const [keyword, setKeyword] = useState(() => searchParams.get('keyword') || '');
   const [loading, setLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [listError, setListError] = useState('');
+  const requestSequence = useRef(0);
+  const previousFilters = useRef('');
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Modals
   const [renewSale, setRenewSale] = useState<Sale | null>(null);
   const [claimSale, setClaimSale] = useState<Sale | null>(null);
 
   const loadWarranties = async () => {
+    const requestId = ++requestSequence.current;
+    const filterKey = JSON.stringify([activeGroupId, statusFilter, keyword, viewMode]);
+    const changed = previousFilters.current !== filterKey;
+    previousFilters.current = filterKey;
     setLoading(true);
+    setListError('');
+    if (changed && pagination.page !== 1) {
+      setPagination(p => ({ ...p, page: 1 }));
+      return;
+    }
     try {
       const res = await warrantyApi.getAll({
         groupId: activeGroupId || undefined,
-        status: statusFilter || undefined
+        status: statusFilter || undefined,
+        keyword: keyword.trim() || undefined,
+        ...(viewMode === 'list' ? { page: pagination.page, limit: pagination.limit } : {})
       });
-      setWarranties(res.data || []);
-    } catch (e) {
-      console.error(e);
+      if (requestId !== requestSequence.current) return;
+      if (viewMode === 'list') {
+        const next = res.data.pagination;
+        if (pagination.page > Math.max(1, next.totalPages)) {
+          setPagination({ ...next, page: Math.max(1, next.totalPages) });
+          return;
+        }
+        setWarranties(res.data.warranties || []);
+        setPagination(next);
+      } else setWarranties(res.data || []);
+    } catch (e: any) {
+      if (requestId === requestSequence.current) setListError(e.message || 'Không thể tải danh sách bảo hành');
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadWarranties();
-  }, [activeGroupId, statusFilter]);
+    void loadWarranties();
+    return () => { requestSequence.current++; };
+  }, [activeGroupId, statusFilter, keyword, viewMode, pagination.page, pagination.limit]);
 
-  const normalize = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
-  const terms = normalize(keyword).trim().split(/\s+/).filter(Boolean);
-  const warranties = allWarranties.filter(sale => {
-    const customer = typeof sale.customerId === 'object' ? sale.customerId : null;
-    const text = normalize(`${sale.productName} ${customer?.name || ''} ${customer?.phone || ''} ${sale.notes || ''}`);
-    return terms.every(term => text.includes(term));
-  });
+  const warranties = allWarranties;
+  const changePage = (page: number) => {
+    setPagination(p => ({ ...p, page }));
+    listRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
 
   // Group by Calendar Date for Calendar View
   const calendarMap = new Map<string, Sale[]>();
@@ -116,7 +143,7 @@ export const Warranty: React.FC = () => {
       {/* Filter Tabs */}
       <div className="relative w-full sm:max-w-lg">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-        <input type="search" aria-label="Tìm đơn bảo hành" placeholder="Tìm sản phẩm, tên khách hoặc số điện thoại…" value={keyword} onChange={event => setKeyword(event.target.value)} className="w-full min-h-12 pl-11 pr-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-base sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 [&::-webkit-search-cancel-button]:appearance-none" />
+        <input type="search" maxLength={200} aria-label="Tìm đơn bảo hành" placeholder="Tìm sản phẩm, tên khách hoặc số điện thoại…" value={keyword} onChange={event => setKeyword(event.target.value)} className="w-full min-h-12 pl-11 pr-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-base sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 [&::-webkit-search-cancel-button]:appearance-none" />
         {keyword && <button type="button" aria-label="Xóa tìm đơn" onClick={() => setKeyword('')} className="absolute right-1 top-1 h-10 w-10 flex items-center justify-center text-slate-400"><X className="h-4 w-4" /></button>}
       </div>
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -140,10 +167,11 @@ export const Warranty: React.FC = () => {
         ))}
       </div>
 
+      {listError && <div role="alert" className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-sm text-rose-600">{listError} <button type="button" className="underline font-semibold" onClick={() => void loadWarranties()}>Thử lại</button></div>}
       {/* View Content */}
       {viewMode === 'list' ? (
         /* List View */
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div ref={listRef} className="scroll-mt-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
           {loading ? (
             <div className="py-20 text-center text-xs text-slate-400">Đang tải dữ liệu bảo hành...</div>
           ) : warranties.length === 0 ? (
@@ -216,6 +244,7 @@ export const Warranty: React.FC = () => {
               })}
             </div>
           )}
+          <Pagination {...pagination} loading={loading} noun="đơn bảo hành" onPageChange={changePage} onLimitChange={limit => setPagination(p => ({ ...p, page: 1, limit }))} />
         </div>
       ) : (
         /* Calendar View */

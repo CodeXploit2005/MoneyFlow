@@ -1,55 +1,45 @@
+import { cleanCustomerName, cleanCustomerPhone, customerContactFilter } from '../utils/customerIdentity.js';
+import { searchPattern, textSearch } from '../utils/search.js';
 import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import Customer from '../models/Customer.js';
 import Sale from '../models/Sale.js';
 import Transaction from '../models/Transaction.js';
-import GroupMember from '../models/GroupMember.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+
+
+const customerInput = (body: any) => {
+  const data: any = {};
+  for (const key of ['name', 'phone', 'zalo', 'email', 'note']) {
+    if (body[key] === undefined) continue;
+    if (typeof body[key] !== 'string') throw new Error('Thông tin khách hàng phải là văn bản');
+    data[key] = body[key].trim();
+  }
+  if (data.name !== undefined) data.name = cleanCustomerName(data.name);
+  if (data.name !== undefined && (!data.name || data.name.length > 160)) throw new Error('Tên khách hàng phải có từ 1 đến 160 ký tự');
+  if (data.phone !== undefined) {
+    data.phone = cleanCustomerPhone(data.phone);
+    if (data.phone && !/^\+?\d{7,15}$/.test(data.phone)) throw new Error('Số điện thoại phải có từ 7 đến 15 chữ số');
+  }
+  if (data.email !== undefined) {
+    data.email = data.email.toLowerCase();
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new Error('Email không hợp lệ');
+  }
+  if ((data.zalo?.length || 0) > 500 || (data.note?.length || 0) > 5000) throw new Error('Thông tin liên hệ hoặc ghi chú quá dài');
+  return data;
+};
+const duplicateContact = async (scope: any, data: any, excludeId?: any) => {
+  const contact = customerContactFilter(data.phone || '', data.email || '');
+  return contact ? Customer.findOne({ ...scope, ...contact, ...(excludeId ? { _id: { $ne: excludeId } } : {}) }).select('_id name') : null;
+};
 
 export const getCustomers = async (req, res) => {
   try {
-    const { groupId, keyword, page = 1, limit = 50 }: any = req.query;
-
-    // Tự động đồng bộ các đối tác/khách hàng từ Sổ Thu Chi sang Danh bạ Khách hàng nếu chưa có
-    try {
-      const distinctCounterparties = await Transaction.distinct('counterparty', {
-        ...(groupId ? { groupId, ...ownDetailsFilter(req) } : { ownerId: (req as any).user._id, groupId: null }),
-        isDeleted: false,
-        counterparty: { $nin: ['', null, 'Nhà cung cấp / Giá vốn', 'Chuyển tiền'] }
-      });
-
-      for (const cp of distinctCounterparties) {
-        if (typeof cp === 'string' && cp.trim().length >= 2) {
-          const raw = cp.trim();
-          let parsedName = raw;
-          let parsedPhone = '';
-          const match = raw.match(/^(.*?)\s*\(?([0-9]{9,11})\)?$/);
-          if (match && match[1]) {
-            parsedName = match[1].trim();
-            parsedPhone = match[2].trim();
-          }
-
-          const existing = await Customer.findOne({
-            ...(groupId ? { groupId, ...ownDetailsFilter(req) } : { ownerId: (req as any).user._id, groupId: null }),
-            $or: [
-              { name: parsedName },
-              ...(parsedPhone ? [{ phone: parsedPhone }] : [])
-            ]
-          });
-
-          if (!existing) {
-            await Customer.create({
-              name: parsedName,
-              phone: parsedPhone,
-              ownerId: (req as any).user._id,
-              groupId: groupId || null,
-              note: 'Đồng bộ từ Sổ Thu Chi'
-            });
-          }
-        }
-      }
-    } catch (syncErr) {
-      console.warn('Sync counterparties warning:', syncErr);
-    }
+    const { groupId, keyword, sort = 'newest' }: any = req.query;
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 50);
+    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) return sendError(res, 'Trang và số khách mỗi trang không hợp lệ (tối đa 100)', 400);
+    if (!['newest', 'name_asc', 'name_desc'].includes(sort)) return sendError(res, 'Cách sắp xếp không hợp lệ', 400);
+    if (keyword !== undefined && (typeof keyword !== 'string' || keyword.length > 200)) return sendError(res, 'Từ khóa tối đa 200 ký tự', 400);
 
     const filter: any = {};
 
@@ -61,29 +51,14 @@ export const getCustomers = async (req, res) => {
       filter.groupId = null;
     }
 
-    if (keyword) {
-      const keywordFilter = {
-        $or: [
-          { name: { $regex: keyword, $options: 'i' } },
-          { phone: { $regex: keyword, $options: 'i' } },
-          { zalo: { $regex: keyword, $options: 'i' } },
-          { email: { $regex: keyword, $options: 'i' } }
-        ]
-      };
-
-      if (filter.$or) {
-        filter.$and = [{ $or: filter.$or }, keywordFilter];
-        delete filter.$or;
-      } else {
-        filter.$or = keywordFilter.$or;
-      }
-    }
+    const pattern = searchPattern(keyword);
+    if (pattern) Object.assign(filter, textSearch(['name', 'phone', 'zalo', 'email'], pattern));
 
     const skip = (Number(page) - 1) * Number(limit);
 
     const [customers, total] = await Promise.all([
       Customer.find(filter)
-        .sort({ createdAt: -1 })
+        .sort(sort === 'name_asc' ? { name: 1, _id: 1 } : sort === 'name_desc' ? { name: -1, _id: -1 } : { createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(Number(limit)),
       Customer.countDocuments(filter)
@@ -122,13 +97,17 @@ export const getCustomerById = async (req, res) => {
 
     // Lấy các giao dịch tương ứng bên mục Sổ Thu Chi (theo saleId hoặc tên/SĐT đối tác)
     const saleIds = sales.map(s => s._id);
+    const sameNameCount = await Customer.countDocuments({ ...scope, name: customer.name });
+    const legacyCounterparties = [
+      ...(sameNameCount === 1 ? [{ counterparty: customer.name }] : []),
+      ...(customer.phone ? [{ counterparty: `${customer.name} (${customer.phone})` }] : [])
+    ];
     const txFilter: any = {
       ...scope,
       isDeleted: false,
       $or: [
         { saleId: { $in: saleIds } },
-        { counterparty: customer.name },
-        ...(customer.phone ? [{ counterparty: { $regex: customer.phone, $options: 'i' } }] : [])
+        ...(legacyCounterparties.length ? [{ saleId: null, $or: legacyCounterparties }] : [])
       ]
     };
     const transactions = await Transaction.find(txFilter).sort({ date: -1, createdAt: -1 }).limit(15);
@@ -155,17 +134,13 @@ export const getCustomerById = async (req, res) => {
 
 export const createCustomer = async (req, res) => {
   try {
-    const { name, phone, zalo, email, note, groupId } = req.body;
-
-    const customer = await Customer.create({
-      name,
-      phone: phone || '',
-      zalo: zalo || '',
-      email: email || '',
-      note: note || '',
-      ownerId: req.user._id,
-      groupId: groupId || null
-    });
+    let data;
+    try { data = customerInput(req.body); if (!data.name) throw new Error('Vui lòng nhập tên khách hàng'); }
+    catch (error) { return sendError(res, error.message, 400); }
+    const groupId = req.body.groupId || null;
+    const scope = groupId ? { groupId } : { ownerId: req.user._id, groupId: null };
+    if (await duplicateContact(scope, data)) return sendError(res, 'SĐT hoặc email đã có trong danh bạ. Hãy tìm và chọn khách đã có.', 409);
+    const customer = await Customer.create({ ...data, ownerId: req.user._id, groupId });
 
     return sendSuccess(res, customer, 'Thêm khách hàng thành công', 201);
   } catch (error) {
@@ -176,17 +151,13 @@ export const createCustomer = async (req, res) => {
 export const updateCustomer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, zalo, email, note } = req.body;
-
-    const customer = await Customer.findByIdAndUpdate(
-      id,
-      { name, phone, zalo, email, note },
-      { new: true, runValidators: true }
-    );
-
-    if (!customer) {
-      return sendError(res, 'Không tìm thấy khách hàng', 404);
-    }
+    const existing = await Customer.findById(id);
+    if (!existing) return sendError(res, 'Không tìm thấy khách hàng', 404);
+    let data;
+    try { data = customerInput(req.body); } catch (error) { return sendError(res, error.message, 400); }
+    const scope = existing.groupId ? { groupId: existing.groupId } : { ownerId: existing.ownerId, groupId: null };
+    if (await duplicateContact(scope, data, id)) return sendError(res, 'SĐT hoặc email đã thuộc một khách hàng khác.', 409);
+    const customer = await Customer.findByIdAndUpdate(id, data, { new: true, runValidators: true });
 
     return sendSuccess(res, customer, 'Cập nhật khách hàng thành công');
   } catch (error) {
@@ -197,6 +168,7 @@ export const updateCustomer = async (req, res) => {
 export const deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
+    if (await Sale.exists({ customerId: id })) return sendError(res, 'Khách hàng đã có đơn hàng. Hãy giữ hồ sơ để bảo toàn lịch sử mua và bảo hành.', 409);
     await Customer.findByIdAndDelete(id);
     return sendSuccess(res, null, 'Xóa khách hàng thành công');
   } catch (error) {

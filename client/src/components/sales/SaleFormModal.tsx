@@ -1,3 +1,4 @@
+import { CustomerSearch } from '../customers/CustomerSearch';
 import { PaymentStatusPicker } from '../ui/PaymentStatusPicker';
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
@@ -48,6 +49,7 @@ export const SaleFormModal: React.FC<SaleFormModalProps> = ({ isOpen, onClose, o
   const resetForm = () => {
     setProductName('');
     setCustomerId('');
+    setCustomers([]);
     setIsNewCustomer(false);
     setNewCustName('');
     setNewCustPhone('');
@@ -64,37 +66,28 @@ export const SaleFormModal: React.FC<SaleFormModalProps> = ({ isOpen, onClose, o
     setCustomerDetail(null);
   };
 
-  const loadCustomers = async () => {
-    try {
-      const res = await customerApi.getAll({ groupId: activeGroupId || undefined, limit: 100 });
-      const rawData = res.data as any;
-      const list = Array.isArray(rawData) ? rawData : (rawData?.customers || []);
-      setCustomers(list);
-    } catch (e) {
-      console.error('Lỗi tải danh sách khách hàng:', e);
-    }
-  };
-
   useEffect(() => {
     if (isOpen) {
-      loadCustomers();
       resetForm();
     }
   }, [isOpen, activeGroupId]);
 
   // Tự động tải dữ liệu đồng bộ từ Sổ Thu Chi khi chọn khách hàng có sẵn
   useEffect(() => {
+    let current = true;
+    setCustomerDetail(null);
     if (customerId && !isNewCustomer) {
       setCustLoading(true);
       customerApi.getById(customerId)
         .then((res: any) => {
-          setCustomerDetail(res.data);
+          if (current) setCustomerDetail(res.data);
         })
         .catch((e) => console.error('Lỗi lấy chi tiết khách hàng:', e))
-        .finally(() => setCustLoading(false));
+        .finally(() => { if (current) setCustLoading(false); });
     } else {
       setCustomerDetail(null);
     }
+    return () => { current = false; };
   }, [customerId, isNewCustomer]);
 
   // Tự động tính toán ngày hết hạn
@@ -257,23 +250,10 @@ export const SaleFormModal: React.FC<SaleFormModalProps> = ({ isOpen, onClose, o
                 />
               </div>
             ) : (
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-all hover:border-emerald-500 dark:hover:border-emerald-500/70 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 cursor-pointer"
-                required={!isNewCustomer}
-              >
-                <option value="">
-                  {customers.length > 0
-                    ? `-- Chọn khách hàng đã có (${customers.length} khách) --`
-                    : '-- Chưa có khách hàng (Bấm "+ Thêm khách mới" ở trên) --'}
-                </option>
-                {customers.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                {customers[0] && <p className="text-sm text-emerald-700 dark:text-emerald-400">Đã chọn: <strong>{customers[0].name}</strong> {customers[0].phone} <span className="text-xs">{customers[0].email}</span></p>}
+                <CustomerSearch groupId={activeGroupId} onSelect={customer => { setCustomerId(customer._id); setCustomers([customer]); }} />
+              </div>
             )}
 
             {/* Dữ liệu liên kết đồng bộ từ Sổ Thu Chi của khách hàng được chọn */}

@@ -1,3 +1,4 @@
+import { OptionPicker } from '../components/ui/OptionPicker';
 import { Avatar } from '../components/ui/Avatar';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -305,15 +306,7 @@ export const GroupDetail: React.FC = () => {
 
                     <div className="flex items-center gap-2 pl-12 sm:pl-0 sm:shrink-0">
                       {isOwner && !isThisUser && m.role !== 'owner' ? (
-                        <select
-                          value={m.role}
-                          onChange={(e) => handleUpdateRole(memberUser._id, e.target.value)}
-                          aria-label={`Vai trò của ${memberUser.name}`}
-                          className="min-h-11 sm:min-h-9 px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 text-slate-800 dark:text-slate-200"
-                        >
-                          <option value="member">Thành viên</option>
-                          <option value="admin">Quản trị viên</option>
-                        </select>
+                        <div className="w-44"><OptionPicker label={`Vai trò của ${memberUser.name}`} value={m.role} onChange={value => handleUpdateRole(memberUser._id, value)} options={[{ value: 'member', label: 'Thành viên' }, { value: 'admin', label: 'Quản trị viên' }]} /></div>
                       ) : (
                         <Badge variant={m.role === 'owner' ? 'warning' : (m.role === 'admin' ? 'info' : 'default')}>
                           {m.role === 'owner' ? 'Chủ nhóm' : (m.role === 'admin' ? 'Quản trị' : 'Thành viên')}
