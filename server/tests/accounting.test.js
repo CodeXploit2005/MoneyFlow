@@ -265,3 +265,35 @@ test('Legacy payment corrections preserve their unlinked nature without inventin
   assert.equal((await Debt.findById(debt._id)).remainingAmount, 50000);
   assert.equal(await Transaction.countDocuments({ ownerId: user._id }), 0);
 });
+
+test('Account edits persist details, preserve renewals and enforce ownership', async () => {
+  const { updateSale } = await import('../src/controllers/saleController.js');
+  const user = { _id: new mongoose.Types.ObjectId(), name: 'Editor' };
+  const customer = await Customer.create({ name: 'Account customer', ownerId: user._id });
+  const created = response();
+  await createSale({ user, body: { productName: 'ChatGPT', customerId: customer._id, price: 300000, cost: 150000, soldAt: '2026-10-09T00:00:00+07:00', warrantyDays: 30 } }, created);
+  assert.equal(created.code, 201);
+  const sale = await Sale.findOne({ ownerId: user._id });
+  sale.warrantyEnd = new Date(sale.warrantyEnd.getTime() + 30 * 86400000);
+  await sale.save();
+  const body = { productName: 'ChatGPT Plus', notes: 'Updated account', customerId: String(customer._id), soldAt: sale.soldAt.toISOString(), warrantyEnd: sale.warrantyEnd.toISOString() };
+  const denied = response();
+  await updateSale({ user: { _id: new mongoose.Types.ObjectId() }, params: { id: sale._id }, body }, denied);
+  assert.equal(denied.code, 400);
+  const saved = response();
+  await updateSale({ user, params: { id: sale._id }, body }, saved);
+  assert.equal(saved.code, 200, JSON.stringify(saved.body));
+  const updated = await Sale.findById(sale._id);
+  assert.equal(updated.notes, body.notes);
+  assert.equal(updated.productName, body.productName);
+  assert.equal(updated.warrantyEnd.toISOString(), body.warrantyEnd);
+  assert.equal(updated.warrantyDays, 30);
+  assert.equal(updated.profit, 150000);
+  const invalid = response();
+  await updateSale({ user, params: { id: sale._id }, body: { ...body, warrantyEnd: '2020-01-01' } }, invalid);
+  assert.equal(invalid.code, 400);
+  const other = await Customer.create({ name: 'Other', ownerId: new mongoose.Types.ObjectId() });
+  const wrongCustomer = response();
+  await updateSale({ user, params: { id: sale._id }, body: { ...body, customerId: String(other._id) } }, wrongCustomer);
+  assert.equal(wrongCustomer.code, 400);
+});

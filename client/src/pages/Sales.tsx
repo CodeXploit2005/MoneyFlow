@@ -5,6 +5,7 @@ import { useGroupStore } from '../store/groupStore';
 import { useAuthStore } from '../store/authStore';
 import { saleApi } from '../api/endpoints';
 import { SaleFormModal } from '../components/sales/SaleFormModal';
+import { EditSaleModal } from '../components/sales/EditSaleModal';
 import { SaleNotes } from '../components/sales/SaleNotes';
 import { RenewModal } from '../components/warranty/RenewModal';
 import { ClaimModal } from '../components/warranty/ClaimModal';
@@ -20,7 +21,8 @@ import {
   QrCode,
   ShieldAlert,
   RefreshCw,
-  CreditCard
+  CreditCard,
+  Pencil
 } from 'lucide-react';
 import { Sale } from '../types';
 
@@ -36,6 +38,7 @@ export const Sales: React.FC = () => {
 
   // Modals
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [editSale, setEditSale] = useState<Sale | null>(null);
   const [renewSale, setRenewSale] = useState<Sale | null>(null);
   const [claimSale, setClaimSale] = useState<Sale | null>(null);
   const [qrSale, setQrSale] = useState<Sale | null>(null);
@@ -218,6 +221,13 @@ export const Sales: React.FC = () => {
 
                       {/* Action buttons */}
                       <div className="flex flex-wrap items-center gap-2 mt-2">
+                        {canEdit && sale.status !== 'void' && (
+                          <Button variant="outline" size="sm" onClick={() => setEditSale(sale)}
+                            className="min-h-11 gap-1.5 border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                            aria-label={`Chỉnh sửa ${sale.productName}`}>
+                            <Pencil className="w-3.5 h-3.5" /> Chỉnh sửa
+                          </Button>
+                        )}
                         {canEdit && sale.status !== 'void' && sale.paymentStatus !== 'paid' && (
                           <Button
                             variant="secondary"
@@ -284,6 +294,8 @@ export const Sales: React.FC = () => {
         onClose={() => setShowAddModal(false)}
         onSuccess={loadSales}
       />
+
+      <EditSaleModal sale={editSale} onClose={() => setEditSale(null)} onSuccess={loadSales} />
 
       {/* Renew Modal */}
       <RenewModal

@@ -287,3 +287,37 @@ async function canAccessSale(sale, userId, write = false) {
   if (!group || !member) return false;
   return write ? own || ['owner', 'admin'].includes(member.role) : own || member.role !== 'member' || !group.settings?.hideAmountsForMembers;
 }
+export const updateSale = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const sale = await Sale.findById(req.params.id).session(session);
+      if (!sale) throw new Error('Không tìm thấy đơn bán');
+      if (!await canAccessSale(sale, req.user._id, true)) throw new Error('Không có quyền chỉnh sửa đơn bán');
+      if (sale.status === 'void') throw new Error('Đơn đã hủy không thể chỉnh sửa');
+      const { productName, notes, customerId, soldAt, warrantyEnd } = req.body;
+      if (typeof productName !== 'string' || !productName.trim() || productName.length > 200 || typeof notes !== 'string' || notes.length > 50000) throw new Error('Tên sản phẩm hoặc thông tin tài khoản không hợp lệ');
+      const saleDate = new Date(soldAt), end = new Date(warrantyEnd);
+      if (!Number.isFinite(saleDate.getTime()) || !Number.isFinite(end.getTime()) || end < saleDate) throw new Error('Ngày hết hạn phải từ ngày bán trở đi');
+      const customer = mongoose.isValidObjectId(customerId) && await Customer.findOne({ _id: customerId, ...(sale.groupId ? { groupId: sale.groupId } : { ownerId: sale.ownerId, groupId: null }) }).session(session);
+      if (!customer) throw new Error('Khách hàng không thuộc không gian làm việc');
+      sale.productName = productName.trim();
+      sale.notes = notes.trim();
+      sale.customerId = customer._id;
+      sale.soldAt = saleDate;
+      // Preserve an existing renewal's start and duration for account-only edits.
+      if (sale.warrantyEnd.getTime() !== end.getTime() || sale.warrantyStart > end) {
+        sale.warrantyStart = saleDate;
+        sale.warrantyEnd = end;
+        sale.warrantyDays = Math.round((end.getTime() - saleDate.getTime()) / 86400000);
+      }
+      sale.status = determineWarrantyStatus(sale.warrantyEnd);
+      await sale.save({ session });
+      result = sale;
+    });
+    if (result.groupId) getSocketIO()?.to(`group_${result.groupId}`).emit('sale:updated', { saleId: result._id });
+    return sendSuccess(res, result, 'Đã cập nhật tài khoản');
+  } catch (error) { return sendError(res, error.message, 400); }
+  finally { await session.endSession(); }
+};

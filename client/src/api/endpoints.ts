@@ -77,6 +77,7 @@ export const categoryApi = {
 
 // Sale APIs
 export const saleApi = {
+  update: async (id: string, data: any) => api.patch(`/sales/${id}`, data),
   getAll: async (params?: any) => {
     return api.get('/sales', { params });
   },

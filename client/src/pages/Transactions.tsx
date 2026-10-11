@@ -405,16 +405,25 @@ export const Transactions: React.FC = () => {
           <>
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+                <colgroup>
+                  <col className="w-[105px]" />
+                  <col />
+                  <col className="w-[205px]" />
+                  <col className="w-[190px]" />
+                  <col className="w-[155px]" />
+                  <col className="w-[85px]" />
+                  <col className="w-[110px]" />
+                </colgroup>
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
                   <tr>
-                    <th className="py-3 px-4">Ngày</th>
-                    <th className="py-3 px-4">Khoản thu / chi</th>
-                    <th className="py-3 px-4">Danh mục</th>
-                    <th className="py-3 px-4">Đối tác / Khách</th>
-                    <th className="py-3 px-4 text-right">Số tiền</th>
-                    <th className="py-3 px-4">Người ghi</th>
-                    <th className="py-3 px-4 text-right">Hành động</th>
+                    <th className="whitespace-nowrap py-3 px-4">Ngày</th>
+                    <th className="whitespace-nowrap py-3 px-4">Khoản thu / chi</th>
+                    <th className="whitespace-nowrap py-3 px-4">Danh mục</th>
+                    <th className="whitespace-nowrap py-3 px-4">Đối tác / Khách</th>
+                    <th className="whitespace-nowrap py-3 px-4 text-right">Số tiền</th>
+                    <th className="whitespace-nowrap py-3 px-4">Người ghi</th>
+                    <th className="whitespace-nowrap py-3 px-4 text-right">Hành động</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -430,12 +439,12 @@ export const Transactions: React.FC = () => {
                           {formatDate(tx.date)}
                         </td>
                         <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-slate-100">
-                          <div className="flex items-center gap-2">
-                            <div className={`p-1.5 rounded-lg ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40'}`}>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className={`shrink-0 p-1.5 rounded-lg ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40'}`}>
                               {tx.type === 'income' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
                             </div>
-                            <div>
-                              <div>{tx.title}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate" title={tx.title}>{tx.title}</div>
                               {tx.saleId && (
                                 <button
                                   type="button"
@@ -444,32 +453,33 @@ export const Transactions: React.FC = () => {
                                     const pName = typeof tx.saleId === 'object' ? tx.saleId.productName : '';
                                     navigate(`/warranty${pName ? `?keyword=${encodeURIComponent(pName)}` : ''}`);
                                   }}
-                                  className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition group cursor-pointer"
+                                  className="inline-flex max-w-full items-center gap-1.5 mt-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition group cursor-pointer"
                                   title="Xem chi tiết đơn hàng & thời hạn bảo hành"
                                 >
                                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                  <span>Đơn bán: {typeof tx.saleId === 'object' ? tx.saleId.productName : 'Xem đơn'}</span>
-                                  <ArrowUpRight className="w-3 h-3 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                  <span className="truncate">Đơn bán: {typeof tx.saleId === 'object' ? tx.saleId.productName : 'Xem đơn'}</span>
+                                  <ArrowUpRight className="w-3 h-3 shrink-0 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                                 </button>
                               )}
-                              {tx.note && <div className="text-xs text-slate-400 font-normal mt-0.5">{tx.note}</div>}
+                              {tx.note && <div className="truncate text-xs text-slate-400 font-normal mt-0.5" title={tx.note}>{tx.note}</div>}
                             </div>
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
                           <div
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold"
+                            title={catName}
+                            className="inline-flex max-w-full items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs font-semibold"
                             style={{
                               backgroundColor: `${catColor}22`,
                               color: catColor
                             }}
                           >
-                            <CategoryIcon name={catIcon} className="w-3.5 h-3.5" />
-                            <span>{catName}</span>
+                            <CategoryIcon name={catIcon} className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{catName}</span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400">
-                          {tx.counterparty || '-'}
+                          <span className="block truncate" title={tx.counterparty || undefined}>{tx.counterparty || '-'}</span>
                         </td>
                         <td className="py-3.5 px-4 text-right font-extrabold whitespace-nowrap">
                           <span className={tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
@@ -533,25 +543,26 @@ export const Transactions: React.FC = () => {
                 const ownerName = typeof tx.ownerId === 'object' ? tx.ownerId?.name : 'Tôi';
                 return (
                   <div key={tx._id} className="p-4 space-y-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`p-2 rounded-xl ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        <div className={`shrink-0 p-2 rounded-xl ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40'}`}>
                           {tx.type === 'income' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
                         </div>
-                        <div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-slate-100">{tx.title}</div>
-                          <div className="flex items-center gap-2 mt-0.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="break-words font-bold text-sm text-slate-900 dark:text-slate-100">{tx.title}</div>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-1">
                             <span className="text-xs text-slate-400">{formatDate(tx.date)}</span>
                             <span className="text-slate-300 dark:text-slate-700">•</span>
                             <div
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold"
+                              title={catName}
+                              className="inline-flex max-w-full items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-lg text-[11px] font-semibold"
                               style={{
                                 backgroundColor: `${catColor}20`,
                                 color: catColor
                               }}
                             >
-                              <CategoryIcon name={catIcon} className="w-3 h-3" />
-                              <span>{catName}</span>
+                              <CategoryIcon name={catIcon} className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{catName}</span>
                             </div>
                           </div>
                           {tx.saleId && (
@@ -571,7 +582,7 @@ export const Transactions: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className={`font-extrabold text-sm ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <div className={`shrink-0 whitespace-nowrap font-extrabold text-sm ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {tx.type === 'income' ? '+' : '-'}{formatVND(tx.amount)}
                       </div>
                     </div>
