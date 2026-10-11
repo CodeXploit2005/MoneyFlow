@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pencil, UserRound, KeyRound, CalendarDays } from 'lucide-react';
+import { DatePicker } from '../ui/DatePicker';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { CustomerSearch } from '../customers/CustomerSearch';
@@ -60,8 +61,8 @@ export const EditSaleModal = ({ sale, onClose, onSuccess }: { sale: Sale | null;
         <section className="space-y-3">
           <h4 className="flex items-center gap-2 text-sm font-semibold"><CalendarDays className="h-4 w-4 text-emerald-500" />Thời hạn sử dụng</h4>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div><label htmlFor="edit-sale-date" className="mb-1.5 block text-sm text-slate-500 dark:text-slate-400">Ngày bán</label><input id="edit-sale-date" type="date" required value={soldAt} onChange={e => setSoldAt(e.target.value)} className={inputClass} /></div>
-            <div><label htmlFor="edit-sale-end" className="mb-1.5 block text-sm text-slate-500 dark:text-slate-400">Ngày hết hạn</label><input id="edit-sale-end" type="date" required min={soldAt} value={end} onChange={e => setEnd(e.target.value)} className={inputClass} /></div>
+            <div><DatePicker id="edit-sale-date" label="Ngày bán" value={soldAt} onChange={setSoldAt} /></div>
+            <div><DatePicker id="edit-sale-end" label="Ngày hết hạn" value={end} min={soldAt} onChange={setEnd} /></div>
           </div>
         </section>
       </fieldset>
