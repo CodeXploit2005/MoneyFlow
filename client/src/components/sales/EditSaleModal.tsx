@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pencil, Save, UserRound, KeyRound, CalendarDays } from 'lucide-react';
+import { Pencil, UserRound, KeyRound, CalendarDays } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { CustomerSearch } from '../customers/CustomerSearch';
@@ -67,7 +67,7 @@ export const EditSaleModal = ({ sale, onClose, onSuccess }: { sale: Sale | null;
       </fieldset>
       <div className="form-actions flex gap-2 sm:justify-end">
         <Button type="button" variant="secondary" disabled={loading} onClick={close} className="min-h-11 flex-1 sm:flex-none">Hủy</Button>
-        <Button type="submit" variant="primary" isLoading={loading} className="min-h-11 flex-1 gap-2 sm:flex-none"><Save className="h-4 w-4" />Lưu thay đổi</Button>
+        <Button type="submit" variant="primary" isLoading={loading} className="min-h-11 flex-1 gap-2 sm:flex-none">Lưu thay đổi</Button>
       </div>
     </form>
   </Modal>;
