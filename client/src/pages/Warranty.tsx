@@ -9,7 +9,7 @@ import { RenewModal } from '../components/warranty/RenewModal';
 import { ClaimModal } from '../components/warranty/ClaimModal';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { formatDate, formatWarrantyTime } from '../utils/format';
+import { formatDate, formatWarrantyTime, formatVND } from '../utils/format';
 import {
   ShieldCheck,
   Calendar,
@@ -21,6 +21,17 @@ import {
   X
 } from 'lucide-react';
 import { Sale } from '../types';
+
+const reconciliationLabels = {
+  matched: 'Khớp số tiền với khoản chi',
+  no_cost: 'Không phát sinh chi phí',
+  missing_link: 'Có chi phí nhưng chưa liên kết chứng từ',
+  missing_transaction: 'Không tìm thấy chứng từ trong phạm vi được xem',
+  deleted_transaction: 'Khoản chi đã nằm trong thùng rác',
+  wrong_transaction: 'Chứng từ sai đơn hoặc sai loại thu/chi',
+  duplicate_link: 'Nhiều lần bảo hành đang dùng chung một chứng từ',
+  amount_mismatch: 'Tiền bảo hành khác số tiền trong sổ thu chi'
+};
 
 export const Warranty: React.FC = () => {
   const { activeGroupId, myRoleInActiveGroup } = useGroupStore();
@@ -214,6 +225,34 @@ export const Warranty: React.FC = () => {
                         </div>
 
                         {sale.notes && <SaleNotes notes={sale.notes} productName={sale.productName} customerName={custName || 'Khách'} />}
+                        <div className="mt-2 text-xs text-slate-500 break-all">Mã đơn: {sale._id}</div>
+                        {!!sale.claims?.length && (
+                          <details className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3 text-sm">
+                            <summary className="cursor-pointer font-semibold text-slate-800 dark:text-slate-200">
+                              {sale.claims.length} lần bảo hành · Tổng chi phí: {formatVND(sale.claims.reduce((sum, claim) => sum + (claim.cost || 0), 0))}
+                              {sale.claims.some(claim => claim.reconciliation && !['matched', 'no_cost'].includes(claim.reconciliation.status)) && <span className="ml-2 text-rose-600">· Cần đối soát</span>}
+                            </summary>
+                            <p className="mt-2 text-xs text-slate-500">Chi phí dưới đây lấy từ lịch sử bảo hành của đơn. Mã chứng từ dùng để đối chiếu trong sổ thu chi; cần kiểm tra số tiền chứng từ khi có chênh lệch.</p>
+                            <ol className="mt-3 space-y-3">
+                              {sale.claims.map((claim, index) => (
+                                <li key={claim._id || index} className="border-t border-slate-100 dark:border-slate-800 pt-2">
+                                  <div className="flex flex-wrap justify-between gap-2 font-semibold">
+                                    <span>Lần {index + 1} · {formatDate(claim.date)}</span>
+                                    <span>{formatVND(claim.cost)}</span>
+                                  </div>
+                                  <div className="text-xs text-slate-500 mt-1">Lỗi: {claim.issue}</div>
+                                  {claim.reconciliation && <div className={`text-xs mt-1 font-semibold ${['matched', 'no_cost'].includes(claim.reconciliation.status) ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {reconciliationLabels[claim.reconciliation.status]}
+                                    {claim.reconciliation.status === 'amount_mismatch' && `: sổ thu chi ${formatVND(claim.reconciliation.transactionAmount)}, lịch sử ${formatVND(claim.cost)}`}
+                                  </div>}
+                                  <div className="text-xs mt-1 break-all">
+                                    {claim.costTransactionId ? `Mã chứng từ: ${claim.costTransactionId}` : (claim.cost || 0) > 0 ? 'Chưa có mã chứng từ liên kết — cần đối soát, không nhập thêm khoản chi khi chưa kiểm tra.' : 'Không phát sinh chi phí.'}
+                                  </div>
+                                </li>
+                              ))}
+                            </ol>
+                          </details>
+                        )}
                       </div>
 
                       {/* Action buttons */}

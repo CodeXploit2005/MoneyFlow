@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { formatVND } from '../../utils/format';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { MoneyInput } from '../ui/MoneyInput';
@@ -18,16 +19,28 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({ isOpen, onClose, sale, o
   const [cost, setCost] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const submitting = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIssue('');
+      setResolution('');
+      setCost(0);
+      setError('');
+    }
+  }, [isOpen, sale?._id]);
 
   if (!sale) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     if (!issue.trim()) {
       setError('Vui lòng mô tả lỗi/vấn đề cần bảo hành');
       return;
     }
 
+    submitting.current = true;
     setLoading(true);
     setError('');
 
@@ -42,6 +55,7 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({ isOpen, onClose, sale, o
     } catch (err: any) {
       setError(err.message || 'Lỗi ghi nhận bảo hành');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -95,8 +109,12 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({ isOpen, onClose, sale, o
           label="Chi phí bảo hành phát sinh (VNĐ - Tự sinh khoản Chi)"
           value={cost}
           onChange={setCost}
-          quickAmounts={[0, 10000, 20000, 50000]}
+          quickAmounts={[0, 86000, 150000]}
         />
+        <p className="text-sm text-slate-600 dark:text-slate-300" aria-live="polite">
+          Lần bảo hành {(sale.claims?.length || 0) + 1} của {custName}: {formatVND(cost)}.
+          {cost > 0 ? ' Khi lưu, hệ thống ghi lịch sử và tạo một khoản chi liên kết với đơn. Không nhập thêm khoản chi thủ công cho lần này.' : ' Khi lưu, hệ thống chỉ ghi lịch sử, không tạo khoản chi.'}
+        </p>
 
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
           <Button type="button" variant="secondary" onClick={onClose}>

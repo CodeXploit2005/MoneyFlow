@@ -64,6 +64,8 @@ export interface Customer {
 }
 
 export interface WarrantyClaim {
+  reconciliation?: { status: 'matched' | 'no_cost' | 'missing_link' | 'missing_transaction' | 'deleted_transaction' | 'wrong_transaction' | 'duplicate_link' | 'amount_mismatch'; transactionAmount?: number };
+  costTransactionId?: string | null;
   _id?: string;
   date: string;
   issue: string;

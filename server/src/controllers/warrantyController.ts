@@ -2,6 +2,8 @@ import Customer from '../models/Customer.js';
 import { searchPattern, textSearch } from '../utils/search.js';
 import { ownDetailsFilter } from '../utils/groupPolicy.js';
 import Sale from '../models/Sale.js';
+import Transaction from '../models/Transaction.js';
+import { reconcileWarrantyClaims } from '../utils/warrantyReconciliation.js';
 import { WarrantyService } from '../services/warrantyService.js';
 import { determineWarrantyStatus } from '../utils/dateUtils.js';
 import { sendSuccess, sendError } from '../utils/response.js';
@@ -61,7 +63,14 @@ export const getWarranties = async (req, res) => {
       }
     });
 
-    return sendSuccess(res, paginated ? { warranties, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } } : warranties);
+    const linkedIds = warranties.flatMap(sale => sale.claims.map(claim => claim.costTransactionId).filter(Boolean));
+    const transactions = linkedIds.length ? await Transaction.find({ ...scope, _id: { $in: linkedIds } }).select('_id saleId type amount isDeleted').lean() : [];
+    const reconciled = warranties.map(sale => {
+      const data = sale.toObject();
+      const checks = reconcileWarrantyClaims(data, transactions);
+      return { ...data, claims: data.claims.map((claim, index) => ({ ...claim, reconciliation: checks[index] })) };
+    });
+    return sendSuccess(res, paginated ? { warranties: reconciled, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } } : reconciled);
   } catch (error) {
     return sendError(res, 'Lỗi lấy danh sách bảo hành: ' + error.message, 500);
   }
